@@ -1,0 +1,15 @@
+{
+  "name": "からだログ",
+  "short_name": "からだログ",
+  "description": "今日やる自宅トレーニングの動画を1本だけ出して、やったことを記録する自分専用アプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f7f6",
+  "theme_color": "#2f7d79",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
