@@ -1,52 +1,16 @@
-/* からだログ Service Worker
- * アプリのファイルを端末にキャッシュして、通信がなくても開けるようにする。
- * ファイルを更新したら CACHE_VERSION の数字を上げること。上げないと古い画面が出続ける。
+/* 旧 Service Worker の後始末。
+ * アプリは /karada-log/app/ に移動した。
+ * この SW は古いキャッシュを全部消し、自分の登録も解除して、開いている画面を読み込み直す。
+ * fetch を受け取らないので、キャッシュを返すことはない。
  */
-const CACHE_VERSION = 'karadalog-v7';
-const ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './icon.svg',
-  './icon-maskable.svg',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-maskable-512.png',
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_VERSION).then(cache => cache.addAll(ASSETS)));
-  self.skipWaiting();
-});
+self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
-
-  // manifest だけは必ずネットワークから取る。
-  // キャッシュを返すと、アプリの id を変えても Chrome が古い id を読み続け、
-  // 「すでにインストールされています」が消えなくなる。
-  if (url.pathname.endsWith('manifest.webmanifest')) {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then(cached =>
-      cached ||
-      fetch(event.request).catch(() =>
-        event.request.mode === 'navigate' ? caches.match('./index.html') : undefined
-      )
-    )
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    await self.registration.unregister();
+    const windows = await self.clients.matchAll({ type: 'window' });
+    windows.forEach(c => c.navigate(c.url));
+  })());
 });

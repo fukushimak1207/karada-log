@@ -2,167 +2,32 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>からだログ</title>
-<meta name="theme-color" content="#2f7d79">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css">
+<meta http-equiv="refresh" content="1; url=./app/">
+<style>
+  body { font-family: system-ui, sans-serif; background: #f3f7f6; color: #1d2b2a;
+         display: grid; place-items: center; min-height: 90vh; margin: 0; padding: 16px; line-height: 1.8; }
+  @media (prefers-color-scheme: dark) { body { background: #141a1a; color: #e8efee; } }
+  a { color: #2f7d79; font-weight: 700; font-size: 1.1rem; }
+  @media (prefers-color-scheme: dark) { a { color: #4fa8a3; } }
+</style>
 </head>
 <body>
-
-<header class="bar">
-  <h1>からだログ</h1>
-  <button id="btn-settings" class="icon-btn" aria-label="設定">設定</button>
-</header>
-
-<main>
-  <!-- 記録の状況 -->
-  <section class="stats" id="stats">
-    <div class="stat">
-      <span class="stat-num" id="stat-streak">0</span>
-      <span class="stat-label">連続</span>
-    </div>
-    <div class="stat">
-      <span class="stat-num" id="stat-week">0</span>
-      <span class="stat-label">今週</span>
-    </div>
-    <div class="stat">
-      <span class="stat-num" id="stat-total">0</span>
-      <span class="stat-label">のべ本数</span>
-    </div>
-  </section>
-
-  <!-- 今日やること -->
-  <section id="today-area">
-    <h2 class="sec-title">今日やること</h2>
-    <div id="today-card"></div>
-  </section>
-
-  <!-- 余力の質問 -->
-  <section id="spare-area" hidden>
-    <div class="card ask">
-      <p class="ask-q">まだもう1本できそうですか？</p>
-      <div class="btn-row">
-        <button id="btn-spare-yes" class="btn primary">できそう</button>
-        <button id="btn-spare-no" class="btn">今日はここまで</button>
-      </div>
-      <p class="note">「できそう」が2回続くと、次からその部位の動画が1段きつくなります。</p>
-    </div>
-  </section>
-
-  <!-- 次の1本(余力があるとき) -->
-  <section id="second-area" hidden>
-    <h2 class="sec-title" id="second-title">追加の1本</h2>
-    <div id="second-card"></div>
-    <p class="note" id="second-note" hidden></p>
-  </section>
-
-  <!-- 部位バランス -->
-  <section>
-    <h2 class="sec-title">部位のバランス（直近30日）</h2>
-    <div class="balance" id="balance"></div>
-  </section>
-
-  <!-- 履歴 -->
-  <section>
-    <h2 class="sec-title">記録</h2>
-    <ul class="history" id="history"></ul>
-  </section>
-</main>
-
-<!-- 設定画面 -->
-<div id="settings" class="sheet" hidden>
-  <div class="sheet-inner">
-    <header class="bar">
-      <h2>設定</h2>
-      <button id="btn-close-settings" class="icon-btn" aria-label="閉じる">閉じる</button>
-    </header>
-
-    <section class="pad">
-      <h3>今日の動画を変える</h3>
-      <p class="note">分類がずれていたり、気分が乗らないときに別の動画へ差し替えます。今日の分だけ変わります。</p>
-      <div class="field">
-        <label for="sel-part">部位</label>
-        <select id="sel-part">
-          <option value="upper">上半身</option>
-          <option value="lower">下半身</option>
-          <option value="core">体幹</option>
-          <option value="full">全身</option>
-          <option value="warmup">ウォームアップ</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="sel-video">動画</label>
-        <select id="sel-video"></select>
-      </div>
-      <button id="btn-apply-video" class="btn primary wide">今日の動画にする</button>
-    </section>
-
-    <section class="pad">
-      <h3>今日の記録を取り消す</h3>
-      <p class="note">間違えて記録したときに使います。今日の分だけ消します。</p>
-      <button id="btn-undo-today" class="btn danger wide">今日の記録を消す</button>
-    </section>
-
-    <section class="pad">
-      <h3>データの持ち出し</h3>
-      <p class="note">
-        <strong>この記録はこの端末の中だけにあります。</strong>
-        ブラウザのデータを消したり機種を変えると消えます。ときどき書き出してください。
-      </p>
-      <div class="btn-row">
-        <button id="btn-export" class="btn">書き出す（JSON）</button>
-        <label class="btn file-label">読み込む<input type="file" id="file-import" accept=".json,application/json" hidden></label>
-      </div>
-      <p class="note" id="backup-note"></p>
-    </section>
-
-    <section class="pad">
-      <h3>部位ごとのレベル</h3>
-      <p class="note">「できそう」の積み上がりで自動的に上がります。手で直すこともできます。</p>
-      <div id="levels"></div>
-    </section>
-
-    <section class="pad">
-      <h3>動画リスト</h3>
-      <p class="note">
-        動画が消された・分類がおかしいときに直します。チェックを外すと出てこなくなります。
-      </p>
-      <ul class="vlist" id="vlist"></ul>
-      <button id="btn-reset-videos" class="btn wide">動画リストを初期状態に戻す</button>
-    </section>
-
-    <section class="pad">
-      <h3>目標</h3>
-      <p class="note">
-        <strong>筋肉を増やす。減量はしない。</strong>
-        <strong>体重が減ったら目標から遠ざかっています。</strong>
-      </p>
-      <div class="field">
-        <label for="goal-memo">目標の数値（この端末の中だけに保存されます）</label>
-        <textarea id="goal-memo" rows="4" placeholder="例&#10;筋肉スコア: 今 ___ → 目標 ___&#10;筋肉量: 今 ___ kg → 目標 ___ kg&#10;見直す日: ____年__月__日"></textarea>
-      </div>
-      <p class="note">
-        測るのは<strong>週1回、同じ曜日・同じ時間・同じ服装</strong>で。日々の増減は見ません。
-        数値そのものは Health Planet のアプリに入れます。
-      </p>
-    </section>
-
-    <section class="pad">
-      <h3>このアプリについて</h3>
-      <p class="note">
-        動画はすべて YouTube「ザ・きんにくTV」の再生リスト「自宅で筋トレ」から選んでいます。
-        動画の再生だけは通信が必要です。記録そのものは通信なしで動きます。
-      </p>
-      <p class="note">体重・体脂肪は Health Planet のアプリで記録してください（このアプリでは扱いません）。</p>
-    </section>
+  <div>
+    <p>からだログは引っ越しました。</p>
+    <p><a href="./app/">新しい場所を開く</a></p>
   </div>
-</div>
-
-<div id="toast" class="toast" hidden></div>
-
-<script src="app.js"></script>
+  <script>
+    // 古い Service Worker とキャッシュが残っていれば、ここで片付ける
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations()
+        .then(rs => Promise.all(rs.map(r => r.scope.endsWith('/karada-log/') ? r.unregister() : null)))
+        .catch(() => {});
+    }
+    if (window.caches) {
+      caches.keys().then(ks => Promise.all(ks.map(k => k.startsWith('karadalog-v') ? caches.delete(k) : null))).catch(() => {});
+    }
+  </script>
 </body>
 </html>

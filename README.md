@@ -50,12 +50,22 @@ YouTube「[ザ・きんにくTV](https://www.youtube.com/@thekinnikutv)」の再
 素の HTML / CSS / JavaScript。ビルド不要。ライブラリも使っていない。
 
 ```
-index.html             画面
-app.js                 ロジックと動画リスト
-style.css              配色(ダークモード対応)
-sw.js                  オフライン動作
-manifest.webmanifest   ホーム画面に追加するための設定
+app/index.html             画面
+app/app.js                 ロジックと動画リスト
+app/style.css              配色(ダークモード対応)
+app/sw.js                  オフライン動作
+app/manifest.webmanifest   ホーム画面に追加するための設定
+index.html                 旧URLから app/ への転送ページ
+sw.js                      旧 Service Worker の後始末(自分で登録を解除する)
 ```
+
+公開先は **https://fukushimak1207.github.io/karada-log/app/**。
+
+> [!note] なぜ app/ の下にあるか
+> もとは `/karada-log/` に置いていたが、Android の Chrome が
+> 「このアプリはすでにインストールされています」と言ったままホーム画面に追加できなくなった。
+> manifest の id・PNG アイコン・Service Worker のキャッシュをひととおり直しても解消しなかったため、
+> URL ごと変えて Chrome から見て別のアプリにした。
 
 **ファイルを更新したら `sw.js` の `CACHE_VERSION` を上げること。**
 上げないとスマホが古いキャッシュを使い続ける。
