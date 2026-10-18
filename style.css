@@ -244,3 +244,6 @@ main { padding: 0 16px; max-width: 560px; margin: 0 auto; }
   font-size: .95rem; font-family: inherit; line-height: 1.6;
   resize: vertical;
 }
+
+/* 記録が無いときのメッセージは2カラムに押し込まない */
+.history li.empty { display: block; }
