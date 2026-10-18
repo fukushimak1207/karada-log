@@ -1,0 +1,19 @@
+# OS が勝手に作るファイル
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 機密情報(保険。このアプリでは使わないが念のため)
+.env
+.env.*
+*.env
+*.pem
+*.key
+*token*
+*secret*
+*credential*
+apikey*
+
+# 個人の身体データを含むため公開しない
+要件定義.md
+要件定義-食事込み-2026-08-16.md
