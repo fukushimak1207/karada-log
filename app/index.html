@@ -8,6 +8,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script>
+  // 旧URL(GitHub Pages)で開かれたら引っ越し先へ送る。
+  // 記録はオリジンごとに別々に保存されるので、両方で使うとデータが2か所に分かれてしまう。
+  if (location.hostname.endsWith('.github.io')) {
+    location.replace('https://karada-log-3ay.pages.dev/');
+  }
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>

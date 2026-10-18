@@ -4,29 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>からだログ</title>
-<meta http-equiv="refresh" content="1; url=./app/">
+<meta http-equiv="refresh" content="1; url=https://karada-log-3ay.pages.dev/">
 <style>
   body { font-family: system-ui, sans-serif; background: #f3f7f6; color: #1d2b2a;
-         display: grid; place-items: center; min-height: 90vh; margin: 0; padding: 16px; line-height: 1.8; }
+         display: grid; place-items: center; min-height: 90vh; margin: 0; padding: 16px; line-height: 1.9; }
   @media (prefers-color-scheme: dark) { body { background: #141a1a; color: #e8efee; } }
   a { color: #2f7d79; font-weight: 700; font-size: 1.1rem; }
   @media (prefers-color-scheme: dark) { a { color: #4fa8a3; } }
+  p { margin: .4em 0; }
+  small { opacity: .75; }
 </style>
 </head>
 <body>
   <div>
     <p>からだログは引っ越しました。</p>
-    <p><a href="./app/">新しい場所を開く</a></p>
+    <p><a href="https://karada-log-3ay.pages.dev/">karada-log-3ay.pages.dev</a></p>
+    <p><small>このページの記録は引き継がれません。新しい場所で使ってください。</small></p>
   </div>
   <script>
-    // 古い Service Worker とキャッシュが残っていれば、ここで片付ける
+    // 古い Service Worker とキャッシュが残っていれば片付ける
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations()
-        .then(rs => Promise.all(rs.map(r => r.scope.endsWith('/karada-log/') ? r.unregister() : null)))
-        .catch(() => {});
+        .then(rs => Promise.all(rs.map(r => r.unregister()))).catch(() => {});
     }
     if (window.caches) {
-      caches.keys().then(ks => Promise.all(ks.map(k => k.startsWith('karadalog-v') ? caches.delete(k) : null))).catch(() => {});
+      caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).catch(() => {});
     }
   </script>
 </body>

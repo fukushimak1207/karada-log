@@ -59,13 +59,21 @@ index.html                 旧URLから app/ への転送ページ
 sw.js                      旧 Service Worker の後始末(自分で登録を解除する)
 ```
 
-公開先は **https://fukushimak1207.github.io/karada-log/app/**。
+公開先は **https://karada-log-3ay.pages.dev/**(Cloudflare Pages)。
+`main` に push すると自動でデプロイされる。
 
-> [!note] なぜ app/ の下にあるか
-> もとは `/karada-log/` に置いていたが、Android の Chrome が
-> 「このアプリはすでにインストールされています」と言ったままホーム画面に追加できなくなった。
-> manifest の id・PNG アイコン・Service Worker のキャッシュをひととおり直しても解消しなかったため、
-> URL ごと変えて Chrome から見て別のアプリにした。
+> [!important] GitHub Pages ではなく Cloudflare Pages で配信している
+> もとは GitHub Pages(`fukushimak1207.github.io/karada-log/`)に置いていたが、
+> Android の Chrome が「このアプリはすでにインストールされています」と言ったまま
+> ホーム画面に追加できなかった。原因は**同じオリジンに複数の PWA を置いていたこと**。
+> web.dev は独立した PWA を別オリジンに置くことを強く推奨している。
+>
+> manifest の id 変更・PNG アイコン・Service Worker のキャッシュ修正・同一オリジン内での
+> URL 変更はどれも効かず、**別オリジンに移して解決した**。
+>
+> リポジトリの `app/` が Cloudflare Pages の公開ディレクトリ。
+> GitHub Pages 側は転送ページとして残してあり、旧URLを開くと新URLへ飛ぶ
+> (記録はオリジンごとに別なので、両方で使うとデータが2か所に分かれるため)。
 
 **ファイルを更新したら `sw.js` の `CACHE_VERSION` を上げること。**
 上げないとスマホが古いキャッシュを使い続ける。
