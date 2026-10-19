@@ -1,9 +1,10 @@
 /* からだログ — 今日やる動画を1本だけ出して、やったことを記録する
  *
  * 考え方
- *  - 部位は 上半身 → 下半身 → 体幹 の順にまわす(最後にやった部位の次を出す)
+ *  - 部位は 下半身 → 上半身 → 全身 → 体幹 の4日サイクル(最後に記録した1本目の部位の次を出す)
  *  - 「まだできそう」が2回続いたら、その部位の動画を1段きつくする
- *  - 2本目は全身の動画から出す(同じ部位を続けると負荷が偏るため)
+ *  - 2本目は同じ部位からもう1本出す(同じ日ならボリュームが増えるだけで回復の妨げにならない)
+ *  - 体重は扱わない。測る日を知らせるだけ(日付だけ持ち、数値は Health Planet に入れる)
  *  - データはこの端末の localStorage だけ。外には出さない
  */
 'use strict';
@@ -18,6 +19,10 @@ const LEVELS = ['easy', 'normal', 'hard'];
 const LEVEL_LABEL = { easy: 'やさしい', normal: 'ふつう', hard: 'きつい' };
 const SPARE_TO_LEVEL_UP = 2;   // 「できそう」がこの回数続いたらレベルを上げる
 const BACKUP_REMIND_DAYS = 30;
+/* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
+ * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
+const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
+const EVAL_DATE = '2027-01-18';    // 3か月後に筋肉量と筋肉スコアを見る日
 
 /* 動画マスタ — YouTube「ザ・きんにくTV」再生リスト「自宅で筋トレ」全30本
  * len は動画の長さ(解説を含む総尺)。実際に動く時間はタイトルの「○分」のほう。
@@ -85,6 +90,12 @@ function diffDays(a, b) {
   return Math.round((ta - tb) / 86400000);
 }
 
+// 0=日曜 ... 6=土曜
+function weekdayOf(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
 // 月曜はじまりの週の初日
 function weekStart(str) {
   const [y, m, d] = str.split('-').map(Number);
@@ -108,6 +119,8 @@ const defaultState = () => ({
   videos: null,                                       // 編集したときだけ配列が入る
   todayPick: null,                                    // {d, id} 手動で選んだ今日の動画
   lastExport: null,
+  measure: { weekday: 0, last: null },                // 測る曜日(既定は日曜)と、最後に測った日
+  evalSeen: false,                                    // 評価日の知らせを確認したか
   goal: '',                                           // 目標の数値。端末内にだけ置く(公開コードに入れない)
 });
 
@@ -125,6 +138,11 @@ function load() {
       if (!LEVELS.includes(state.levels[p])) state.levels[p] = 'easy';
       if (typeof state.spareRun[p] !== 'number') state.spareRun[p] = 0;
     });
+    // measure は後から足した項目。古い保存データには無いので作り直す
+    if (!state.measure || typeof state.measure !== 'object') state.measure = { weekday: 0, last: null };
+    const wd = Number(state.measure.weekday);
+    state.measure.weekday = (Number.isInteger(wd) && wd >= 0 && wd <= 6) ? wd : 0;
+    if (typeof state.measure.last !== 'string') state.measure.last = null;
   } catch (e) {
     console.warn('保存データを読めなかったので初期状態で始めます', e);
     state = defaultState();
@@ -319,6 +337,41 @@ function balance30() {
   return counts;
 }
 
+/* ---------- 測る日の知らせ ---------- */
+
+/* 出すものを決めて返す。何も出さないときは null。
+ * 数値は持たない。「測った」を押した日付だけを残す。 */
+function measureNotice(d) {
+  const today = d || todayStr();
+  const last = state.measure.last;
+  if (last === today) return null;                       // 今日はもう測った
+
+  if (last) {
+    const gap = diffDays(today, last);
+    if (gap >= MEASURE_GAP_WARN) {
+      return { kind: 'gap', text: `前回の測定から${gap}日たっています。` };
+    }
+  }
+  if (weekdayOf(today) !== state.measure.weekday) return null;
+  return {
+    kind: 'day',
+    text: last ? `今日は測る日です（前回 ${fmtDate(last)}）` : '今日は測る日です。',
+  };
+}
+
+function markMeasured() {
+  state.measure.last = todayStr();
+  save();
+}
+
+// 評価日(3か月後の見直し)。一度確認したら出さない
+function evalNotice(d) {
+  const today = d || todayStr();
+  if (state.evalSeen) return null;
+  if (diffDays(today, EVAL_DATE) < 0) return null;
+  return { kind: 'eval', text: '見直しの日です。筋肉量と筋肉スコアを確認してください。' };
+}
+
 /* ---------- 画面 ---------- */
 
 const $ = sel => document.querySelector(sel);
@@ -380,6 +433,8 @@ function render() {
   const d = todayStr();
   const today = logsOf(d);
 
+  renderNotices();
+
   // 状況
   $('#stat-streak').textContent = streak();
   $('#stat-week').textContent = thisWeekDays();
@@ -415,6 +470,33 @@ function render() {
   renderBalance();
   renderHistory();
   renderBackupNote();
+}
+
+function renderNotices() {
+  const el = $('#notices');
+  if (!el) return;
+  const items = [];
+
+  const m = measureNotice();
+  if (m) {
+    items.push(`<div class="notice">
+      <p class="notice-text">${escapeHtml(m.text)}</p>
+      <p class="note">数値は Health Planet のアプリに入れてください。ここには日付だけ残ります。</p>
+      <div class="btn-row"><button class="btn primary" data-act="measured">測った</button></div>
+    </div>`);
+  }
+
+  const e = evalNotice();
+  if (e) {
+    items.push(`<div class="notice">
+      <p class="notice-text">${escapeHtml(e.text)}</p>
+      <p class="note">増えていなければ、トレーニング量を増やすか食べる量を見直すかを決めます。</p>
+      <div class="btn-row"><button class="btn" data-act="eval-seen">確認した</button></div>
+    </div>`);
+  }
+
+  el.innerHTML = items.join('');
+  el.hidden = !items.length;
 }
 
 function renderBalance() {
@@ -473,6 +555,14 @@ function renderBackupNote() {
 function renderSettings() {
   const g = $('#goal-memo');
   if (g) g.value = state.goal || '';
+  const w = $('#sel-measure-day');
+  if (w) w.value = String(state.measure.weekday);
+  const ml = $('#measure-last');
+  if (ml) {
+    ml.textContent = state.measure.last
+      ? `前回の測定: ${state.measure.last}`
+      : 'まだ測った記録がありません。';
+  }
   renderPartSelect();
   renderLevels();
   renderVideoList();
@@ -574,6 +664,21 @@ function bind() {
     toast('記録しました');
   });
 
+  // 測る日の知らせ
+  document.addEventListener('click', ev => {
+    const btn = ev.target.closest('[data-act]');
+    if (!btn) return;
+    if (btn.dataset.act === 'measured') {
+      markMeasured();
+      render();
+      toast('測定日を記録しました');
+    } else if (btn.dataset.act === 'eval-seen') {
+      state.evalSeen = true;
+      save();
+      render();
+    }
+  });
+
   $('#btn-spare-yes').addEventListener('click', () => { setSpare(true); render(); });
   $('#btn-spare-no').addEventListener('click', () => { setSpare(false); render(); toast('おつかれさまでした'); });
 
@@ -581,6 +686,13 @@ function bind() {
   $('#goal-memo').addEventListener('input', ev => {
     state.goal = ev.target.value;
     save();
+  });
+
+  // 測る曜日
+  $('#sel-measure-day').addEventListener('change', ev => {
+    state.measure.weekday = Number(ev.target.value);
+    save();
+    renderSettings();
   });
 
   // 設定の開閉

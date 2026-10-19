@@ -25,6 +25,9 @@
 </header>
 
 <main>
+  <!-- 測る日などの知らせ(開いたときだけ出る。Webアプリは定時に通知を鳴らせない) -->
+  <div id="notices" hidden></div>
+
   <!-- 記録の状況 -->
   <section class="stats" id="stats">
     <div class="stat">
@@ -139,6 +142,28 @@
       </p>
       <ul class="vlist" id="vlist"></ul>
       <button id="btn-reset-videos" class="btn wide">動画リストを初期状態に戻す</button>
+    </section>
+
+    <section class="pad">
+      <h3>体組成を測る日</h3>
+      <p class="note">
+        選んだ曜日にアプリを開くと、画面の上に知らせが出ます。
+        <strong>数値はここには入りません。</strong>測った日付だけを残します。
+      </p>
+      <div class="field">
+        <label for="sel-measure-day">測る曜日</label>
+        <select id="sel-measure-day">
+          <option value="0">日曜</option>
+          <option value="1">月曜</option>
+          <option value="2">火曜</option>
+          <option value="3">水曜</option>
+          <option value="4">木曜</option>
+          <option value="5">金曜</option>
+          <option value="6">土曜</option>
+        </select>
+      </div>
+      <p class="note" id="measure-last"></p>
+      <p class="note">前回から10日以上空いたときは、曜日に関係なく知らせます。</p>
     </section>
 
     <section class="pad">

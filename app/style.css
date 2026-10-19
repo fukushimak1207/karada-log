@@ -247,3 +247,16 @@ main { padding: 0 16px; max-width: 560px; margin: 0 auto; }
 
 /* 記録が無いときのメッセージは2カラムに押し込まない */
 .history li.empty { display: block; }
+
+/* 測る日などの知らせ */
+#notices { display: grid; gap: 10px; margin-bottom: 16px; }
+.notice {
+  border: 1px solid var(--accent);
+  border-left: 5px solid var(--accent);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--card);
+}
+.notice-text { margin: 0 0 4px; font-weight: 700; }
+.notice .note { margin: 0 0 10px; }
+.notice .btn-row { margin: 0; }
