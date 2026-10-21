@@ -18,8 +18,13 @@ const PART_LABEL = { upper: '上半身', lower: '下半身', core: '体幹', ful
 const LEVELS = ['easy', 'normal', 'hard'];
 const LEVEL_LABEL = { easy: 'やさしい', normal: 'ふつう', hard: 'きつい' };
 const SPARE_TO_LEVEL_UP = 2;   // 「できそう」がこの回数続いたらレベルを上げる
+/* 1日にやる本数。1本目=部位のローテ、2本目=体幹(体幹の日は上半身の手薄なところ)。
+ * 腹筋を増やしたいという本人の希望で、2026-10-21 に1本立てから変えた。 */
+const PLAN_SLOTS = 2;
+const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回まで
+const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v6';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v7';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -37,6 +42,14 @@ const DEFAULT_VIDEOS = [
   { id: 'DAI9IcAxfPA', name: '肩（三角筋）7種目4分', len: '16:27', part: 'upper', sub: '肩', level: 'normal' },
   { id: 'yjTD95S3TUc', name: '二の腕＆力こぶ 7種目4分半', len: '15:33', part: 'upper', sub: '腕', level: 'easy' },
   { id: 'LARsdRVCvHU', name: '上半身6分（ペットボトルでも可）', len: '13:45', part: 'upper', sub: '上半身まとめて', level: 'normal' },
+
+  // 背中と腕の補充(CALISLIFE自重トレ)。きんにくTV は背中1本・腕1本しか無く、
+  // 器具なしで「引く」種目が作れないため。タオルは家にあるので追加購入は不要。
+  { id: 'IgwjbjOAxQk', name: 'タオルで背中全体 6分', len: '6:04', part: 'upper', sub: '背中', level: 'easy' },
+  { id: 'Q-LGg-58_ZU', name: '背筋7種目 器具なし 6分', len: '6:18', part: 'upper', sub: '背中', level: 'normal' },
+  { id: 'fk1fw8ERt7E', name: '背筋100回 9種目 6分', len: '6:50', part: 'upper', sub: '背中', level: 'hard' },
+  { id: 'UHn8wAbY0L0', name: 'タオルで上腕二頭筋', len: '4:46', part: 'upper', sub: '腕', level: 'easy' },
+  { id: 'DGdaX4PqoLg', name: '上腕三頭筋 4種目', len: '4:50', part: 'upper', sub: '腕', level: 'normal' },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
   { id: 'BFitLouawaM', name: '脚 7種目3分半（初級）', len: '15:15', part: 'lower', sub: '太もも', level: 'easy' },
@@ -66,6 +79,12 @@ const DEFAULT_VIDEOS = [
   { id: '590CWWrC4PM', name: 'プランク 7種目4分', len: '13:24', part: 'core', sub: 'プランク', level: 'normal' },
   { id: 'o5vb430_m38', name: '下腹部＆くびれ 10種目10分', len: '10:50', part: 'core', sub: '下腹', level: 'normal' },
   { id: '0HIaPspC7lQ', name: '腹筋・お尻・内腿 10種目10分', len: '17:01', part: 'core', sub: '腹とお尻', level: 'hard' },
+
+  // 腹筋ローラー。持っているのに使う動画が無かったので足す。
+  // sub が ROLLER_SUB のものは、腰を痛めないよう2日に1回までしか出さない。
+  { id: 'Z-h6_7In8G0', name: 'ローラー 安全な使い方とフォーム', len: '4:41', part: 'core', sub: 'ローラー', level: 'easy' },
+  { id: 'q2p3JUSlwXo', name: 'ローラー 腹筋5種目（世界チャンプ直伝）', len: '5:58', part: 'core', sub: 'ローラー', level: 'normal' },
+  { id: 'qhO8aBENLjk', name: 'ローラー 腹直筋と腹斜筋 8分', len: '8:32', part: 'core', sub: 'ローラー', level: 'hard' },
 
   { id: 'fZJO5hYB0Tc', name: 'ウォーミングアップ（動的ストレッチ）', len: '9:20', part: 'warmup', sub: '準備運動', level: 'easy' },
 ];
@@ -190,8 +209,29 @@ function recentSubs(part, n) {
   return subs;
 }
 
+/* ローラーを今日出してよいか。直近 ROLLER_REST_DAYS 日に使っていたら出さない。
+ * 腹筋ローラーは腰を痛めやすく、本人は始めたばかりのため。 */
+function rollerOk(d) {
+  const today = d || todayStr();
+  for (let i = state.logs.length - 1; i >= 0; i--) {
+    const l = state.logs[i];
+    const gap = diffDays(today, l.d);
+    if (gap > ROLLER_REST_DAYS) break;
+    if (gap === 0 && l.d === today) {
+      const v0 = findVideo(l.id);
+      if (v0 && v0.sub === ROLLER_SUB) return false;
+      continue;
+    }
+    const v = findVideo(l.id);
+    if (v && v.sub === ROLLER_SUB) return false;
+  }
+  return true;
+}
+
 function pickVideo(part, level, excludeIds) {
-  const pool = videos().filter(v => v.on !== false && v.part === part);
+  let pool = videos().filter(v => v.on !== false && v.part === part);
+  if (!rollerOk()) pool = pool.filter(v => v.sub !== ROLLER_SUB);
+  if (!pool.length) pool = videos().filter(v => v.on !== false && v.part === part);
   if (!pool.length) return null;
 
   const recent = new Set(excludeIds || []);
@@ -241,6 +281,21 @@ function todaysPlan() {
 // 別の部位を足すと、その部位の回復日程がずれる。
 // 動画は今日やったものと別になり、pickVideo が直近の細かい部位も避けるので、
 // 胸をやった日の次は背中や肩が出る。
+/* 今日の slot 番目にやる分を決める。
+ *  slot 1 … 部位のローテ(下半身→上半身→全身→体幹)
+ *  slot 2 … 体幹。1本目が体幹の日は、上半身の手薄なところ(背中・腕)
+ * PLAN_SLOTS を超えた分は nextPlan()(余力があるときの追加)が決める。 */
+function planFor(slot) {
+  if (slot <= 1) return todaysPlan();
+  const d = todayStr();
+  const done = logsOf(d).map(l => l.id);
+  const mainPart = (logsOf(d).find(l => l.slot === 1) || {}).part || nextPart();
+  const part = mainPart === 'core' ? 'upper' : 'core';
+  const level = state.levels[part] || 'easy';
+  const v = pickVideo(part, level, done);
+  return v ? { video: v, part, level: v.level } : null;
+}
+
 function nextPlan() {
   const d = todayStr();
   const todayLogs = logsOf(d);
@@ -263,7 +318,9 @@ function recordDone(video, part, level, slot) {
   const d = todayStr();
   // 2本目を「実際にやった」ことを、この日のレベル上げの条件にする。
   // 「できそう」と答えただけでやらなかった日に上がってしまうのを防ぐ。
-  const firstExtra = slot >= 2 && !logsOf(d).some(l => l.slot >= 2);
+  // 決められた本数(PLAN_SLOTS)を超えて、実際にやった日だけ数える。
+  // 2本目は毎日やる前提になったので、「2本目をやった=余力あり」ではなくなった。
+  const firstExtra = slot > PLAN_SLOTS && !logsOf(d).some(l => l.slot > PLAN_SLOTS);
   state.logs.push({ d, id: video.id, part, level, spare: null, slot });
   if (firstExtra) countSpareDay(part);
   save();
@@ -294,7 +351,7 @@ function setSpare(hasSpare) {
   // レベルを上げるのは「2本目を実際にやった日」だけ(recordDone で数える)。
   // ここでは「ここまで」と答えたときの据え置き(積み上がりを戻す)だけを見る。
   // 1本目の回答だけを見るのは、1日に何段も上がらないようにするため。
-  if (answered.slot === 1 && !hasSpare) {
+  if (answered.slot === PLAN_SLOTS && !hasSpare) {
     const part = PARTS.includes(answered.part) ? answered.part : null;
     if (part) state.spareRun[part] = 0;
   }
@@ -412,7 +469,9 @@ function cardHtml(plan, slot) {
         <a class="btn primary" href="${ytUrl(v.id)}" target="_blank" rel="noopener">動画を開く</a>
         <button class="btn" data-done="${slot}" data-id="${escapeHtml(v.id)}" data-part="${plan.part}" data-level="${v.level}">やった</button>
       </div>
-      <p class="note">動画の回数で止めず、<strong>できなくなるところまで</strong>。筋肉を増やすにはここが効きます。</p>
+      <p class="note">${v.sub === ROLLER_SUB
+        ? '<strong>膝をついたまま（膝コロ）で。</strong>腰が反ると痛めます。できる回数で止めてください。'
+        : '動画の回数で止めず、<strong>できなくなるところまで</strong>。筋肉を増やすにはここが効きます。'}</p>
     </div>`;
 }
 
@@ -447,19 +506,27 @@ function render() {
   $('#stat-week').textContent = thisWeekDays();
   $('#stat-total').textContent = state.logs.length;
 
-  // 今日やること / 今日やったこと(何本でも並べる)
-  // 出した plan は覚えておく。意見に添える情報が画面と食い違わないようにするため
-  shownPlan = today.length ? null : todaysPlan();
-  $('#today-card').innerHTML = today.length
-    ? today.map(l => doneCardHtml(l)).join('')
-    : cardHtml(shownPlan, 1);
+  // 今日やること = 決められた本数(PLAN_SLOTS)。やった分は記録カードに変わる
+  const cards = [];
+  shownPlan = null;
+  for (let slot = 1; slot <= Math.max(PLAN_SLOTS, today.length); slot++) {
+    const log = today[slot - 1];
+    if (log) { cards.push(doneCardHtml(log)); continue; }
+    const plan = planFor(slot);
+    if (!shownPlan) shownPlan = plan;            // 意見に添える情報は「次にやる分」を使う
+    cards.push(plan
+      ? cardHtml(plan, slot)
+      : '<div class="card"><p class="note">出せる動画がありません。設定の「動画リスト」を確認してください。</p></div>');
+  }
+  $('#today-card').innerHTML = cards.join('');
 
-  // 余力の質問 → 記録済みで、まだ余力を答えていないとき
+  // 余力の質問 → 決められた分をやり終えて、まだ答えていないとき
   const last = today[today.length - 1];
-  $('#spare-area').hidden = !(last && last.spare === null);
+  const planDone = today.length >= PLAN_SLOTS;
+  $('#spare-area').hidden = !(last && last.spare === null && planDone);
 
-  // 次の1本 → 最後の回答が「できそう」のとき。何本目でも出す
-  if (last && last.spare === true) {
+  // 追加の1本 → 決められた分を終えたあと「できそう」と答えたとき
+  if (last && last.spare === true && planDone) {
     const n = today.length + 1;
     const plan = nextPlan();
     $('#second-area').hidden = false;
@@ -468,8 +535,8 @@ function render() {
       ? cardHtml(plan, n)
       : '<div class="card"><p class="note">今日はもう出せる動画がありません。</p></div>';
     const note = $('#second-note');
-    note.hidden = n < 3;
-    if (n >= 3) {
+    note.hidden = n < PLAN_SLOTS + 1;
+    if (n >= PLAN_SLOTS + 1) {
       note.textContent = '無理はしないでください。慣れないうちは筋肉痛が数日残って、かえって続かなくなります。';
     }
   } else {
