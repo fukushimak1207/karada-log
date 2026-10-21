@@ -19,6 +19,7 @@ const LEVELS = ['easy', 'normal', 'hard'];
 const LEVEL_LABEL = { easy: 'やさしい', normal: 'ふつう', hard: 'きつい' };
 const SPARE_TO_LEVEL_UP = 2;   // 「できそう」がこの回数続いたらレベルを上げる
 const BACKUP_REMIND_DAYS = 30;
+const APP_VERSION = 'karadalog-cf-v3';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -376,6 +377,8 @@ function evalNotice(d) {
 
 const $ = sel => document.querySelector(sel);
 
+let shownPlan = null;   // 今この画面に出している「今日やること」
+
 function toast(msg) {
   const el = $('#toast');
   el.textContent = msg;
@@ -441,9 +444,11 @@ function render() {
   $('#stat-total').textContent = state.logs.length;
 
   // 今日やること / 今日やったこと(何本でも並べる)
+  // 出した plan は覚えておく。意見に添える情報が画面と食い違わないようにするため
+  shownPlan = today.length ? null : todaysPlan();
   $('#today-card').innerHTML = today.length
     ? today.map(l => doneCardHtml(l)).join('')
-    : cardHtml(todaysPlan(), 1);
+    : cardHtml(shownPlan, 1);
 
   // 余力の質問 → 記録済みで、まだ余力を答えていないとき
   const last = today[today.length - 1];
@@ -649,6 +654,183 @@ function importJson(file) {
   reader.readAsText(file);
 }
 
+/* ---------- 意見(フィードバック) ---------- */
+/* 送り先は Cloudflare Pages Functions(/api/feedback) 経由で GitHub の非公開リポジトリ。
+ * 鍵はページに置かない。ここが持つのは利用者が打ち込む合言葉だけ。
+ * 「どの画面の、どの状態から送ったか」を自動で添えるので、本文に書かなくても伝わる。 */
+
+const FB_API = '/api/feedback';
+const FB_KEY = 'karadalog.fb';     // 合言葉と、送った直後の控え
+const FB_KINDS = ['不具合', '要望', 'その他'];
+
+let fbState = { aikotoba: '', sent: [] };
+let fbKind = '要望';
+let fbScroll = 0;
+
+function fbLoad() {
+  try {
+    const raw = localStorage.getItem(FB_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    fbState.aikotoba = typeof p.aikotoba === 'string' ? p.aikotoba : '';
+    fbState.sent = Array.isArray(p.sent) ? p.sent : [];
+  } catch (e) { fbState = { aikotoba: '', sent: [] }; }
+}
+
+function fbSave() {
+  try { localStorage.setItem(FB_KEY, JSON.stringify(fbState)); } catch (e) { /* 入らなくても送信はできる */ }
+}
+
+/* 送信時に自動で添える情報。体重・体脂肪・目標メモは入れない(端末内に留める約束) */
+function screenInfo() {
+  const d = todayStr();
+  const today = logsOf(d);
+  const last = today[today.length - 1];
+  const settingsOpen = !$('#settings').hidden;
+  const v = today.length ? findVideo(last.id) : (shownPlan && shownPlan.video);
+  const part = today.length ? last.part : (shownPlan && shownPlan.part);
+  const notice = measureNotice() ? '測る日' : (evalNotice() ? '見直しの日' : '');
+  return {
+    tab: settingsOpen ? '設定' : '今日やること',
+    path: location.pathname,
+    video: v ? v.name : '',
+    part: PART_LABEL[part] || part || '',
+    level: v ? (LEVEL_LABEL[v.level] || v.level) : '',
+    slot: today.length ? `${today.length}本目まで記録` : '記録前',
+    doneToday: today.length > 0,
+    noticeShown: notice,
+    appVersion: APP_VERSION,
+    width: window.innerWidth,
+  };
+}
+
+function fbContextText(info) {
+  const bits = [info.video, info.part].filter(Boolean).join('・');
+  return `送り先の情報として「${info.tab}${bits ? '（' + bits + '）' : ''}」も一緒に保存します。`;
+}
+
+function fbOpen() {
+  const info = screenInfo();
+  $('#fb-context').textContent = fbContextText(info);
+  $('#fb-aikotoba-field').hidden = Boolean(fbState.aikotoba);
+  $('#fb-msg').hidden = true;
+  fbRenderKinds();
+  fbRenderList(fbState.sent);
+  fbScroll = window.scrollY;
+  document.body.classList.add('no-scroll');   // 背景をスクロールさせない
+  $('#fb').hidden = false;
+  $('#fb-text').focus();
+  fbFetchList();
+}
+
+function fbClose() {
+  $('#fb').hidden = true;
+  document.body.classList.remove('no-scroll');
+  window.scrollTo(0, fbScroll);
+}
+
+function fbRenderKinds() {
+  $('#fb-kinds').querySelectorAll('.chip').forEach(b => {
+    b.classList.toggle('on', b.dataset.kind === fbKind);
+    b.setAttribute('aria-pressed', String(b.dataset.kind === fbKind));
+  });
+}
+
+function fbMsg(text) {
+  const el = $('#fb-msg');
+  el.textContent = text;
+  el.hidden = false;
+}
+
+function fbItemHtml(it) {
+  const when = String(it.createdAt || '').slice(0, 10);
+  const scr = it.screen || {};
+  const where = [scr.tab, scr.video].filter(Boolean).join('・');
+  const reply = it.reply
+    ? `<p class="fb-reply">${escapeHtml(it.reply)}</p>`
+    : '';
+  return `<li class="fb-item">
+    <p class="fb-text">${escapeHtml(it.text || '')}</p>
+    <p class="fb-meta">
+      <span class="fb-kind">${escapeHtml(it.kind || '')}</span>
+      ${where ? `<span>${escapeHtml(where)}</span>` : ''}
+      <span>${escapeHtml(when)}</span>
+      <span class="fb-status ${it.status === '対応済み' ? 'done' : ''}">${escapeHtml(it.status || '未対応')}</span>
+    </p>
+    ${reply}
+  </li>`;
+}
+
+function fbRenderList(items) {
+  const ul = $('#fb-list');
+  if (!items || !items.length) {
+    ul.innerHTML = '<li class="empty">まだ意見はありません。</li>';
+    return;
+  }
+  ul.innerHTML = items.map(fbItemHtml).join('');
+}
+
+// 送った直後の1件は GitHub の一覧にすぐ出ない(数秒遅れる)。
+// 控えを先頭に足して見せ、番号が一致したら取り直した側を優先する。
+function fbMerge(server) {
+  const nums = new Set(server.map(i => i.number));
+  const pending = fbState.sent.filter(i => !nums.has(i.number));
+  return pending.concat(server);
+}
+
+async function fbFetchList() {
+  if (!fbState.aikotoba) return;
+  try {
+    const r = await fetch(`${FB_API}?aikotoba=${encodeURIComponent(fbState.aikotoba)}`, { cache: 'no-store' });
+    const data = await r.json();
+    if (!data.ok) { fbMsg(data.error || '一覧を取れませんでした'); return; }
+    fbState.sent = fbMerge(data.items).slice(0, 50);
+    fbSave();
+    fbRenderList(fbState.sent);
+  } catch (e) {
+    // 通信できないときは控えだけ見せる(送信前なので何も壊れない)
+    fbRenderList(fbState.sent);
+  }
+}
+
+async function fbSend() {
+  const text = $('#fb-text').value.trim();
+  if (!text) { fbMsg('内容を書いてください'); return; }
+
+  if (!fbState.aikotoba) {
+    const word = $('#fb-aikotoba').value.trim();
+    if (!word) { fbMsg('合言葉を入れてください'); return; }
+    fbState.aikotoba = word;
+  }
+
+  const btn = $('#fb-send');
+  btn.disabled = true;
+  try {
+    const r = await fetch(FB_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aikotoba: fbState.aikotoba, kind: fbKind, text, screen: screenInfo() }),
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      if (r.status === 401) fbState.aikotoba = '';          // 合言葉が違えば入れ直してもらう
+      $('#fb-aikotoba-field').hidden = Boolean(fbState.aikotoba);
+      fbMsg(data.error || '送れませんでした。通信を確かめてもう一度押してください');
+      return;
+    }
+    fbState.sent = [data.item].concat(fbState.sent).slice(0, 50);
+    fbSave();
+    $('#fb-text').value = '';
+    $('#fb-aikotoba-field').hidden = true;
+    fbRenderList(fbState.sent);
+    fbMsg('送りました。チャットで「フィードバック見て」と送ると対応します');
+  } catch (e) {
+    fbMsg('送れませんでした。通信を確かめてもう一度押してください');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 /* ---------- 画面の操作 ---------- */
 
 function bind() {
@@ -694,6 +876,23 @@ function bind() {
     save();
     renderSettings();
   });
+
+  // 意見シート
+  $('#btn-feedback').addEventListener('click', fbOpen);
+  $('#fb-close').addEventListener('click', fbClose);
+  $('#fb').addEventListener('click', ev => {           // 外側をタップ
+    if (ev.target === $('#fb')) fbClose();
+  });
+  document.addEventListener('keydown', ev => {         // Esc
+    if (ev.key === 'Escape' && !$('#fb').hidden) fbClose();
+  });
+  $('#fb-kinds').addEventListener('click', ev => {
+    const b = ev.target.closest('.chip');
+    if (!b) return;
+    fbKind = FB_KINDS.includes(b.dataset.kind) ? b.dataset.kind : 'その他';
+    fbRenderKinds();
+  });
+  $('#fb-send').addEventListener('click', fbSend);
 
   // 設定の開閉
   $('#btn-settings').addEventListener('click', () => {
@@ -779,6 +978,7 @@ function bind() {
 /* ---------- 起動 ---------- */
 
 load();
+fbLoad();
 bind();
 render();
 

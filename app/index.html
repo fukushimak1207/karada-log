@@ -21,7 +21,10 @@
 
 <header class="bar">
   <h1>からだログ</h1>
-  <button id="btn-settings" class="icon-btn" aria-label="設定">設定</button>
+  <span class="bar-btns">
+    <button id="btn-feedback" class="icon-btn" aria-label="意見を送る">意見</button>
+    <button id="btn-settings" class="icon-btn" aria-label="設定">設定</button>
+  </span>
 </header>
 
 <main>
@@ -190,6 +193,45 @@
       </p>
       <p class="note">体重・体脂肪は Health Planet のアプリで記録してください（このアプリでは扱いません）。</p>
     </section>
+  </div>
+</div>
+
+<!-- 意見シート -->
+<div id="fb" class="fb-back" hidden>
+  <div class="fb-sheet" role="dialog" aria-modal="true" aria-labelledby="fb-title">
+    <header class="bar">
+      <h2 id="fb-title">意見</h2>
+      <button id="fb-close" class="icon-btn" aria-label="閉じる">閉じる</button>
+    </header>
+    <div class="pad">
+      <p class="note" id="fb-context"></p>
+
+      <div class="field" id="fb-aikotoba-field" hidden>
+        <label for="fb-aikotoba">合言葉（この端末で最初の1回だけ）</label>
+        <input id="fb-aikotoba" type="password" autocomplete="off" inputmode="text">
+        <p class="note">送り先を自分だけに限るための言葉です。端末の中にだけ残ります。</p>
+      </div>
+
+      <div class="field">
+        <span class="label">種類</span>
+        <div class="chips" id="fb-kinds">
+          <button type="button" class="chip" data-kind="不具合">不具合</button>
+          <button type="button" class="chip on" data-kind="要望">要望</button>
+          <button type="button" class="chip" data-kind="その他">その他</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fb-text">内容</label>
+        <textarea id="fb-text" rows="4" placeholder="気づいたことを書いてください"></textarea>
+      </div>
+
+      <button id="fb-send" class="btn primary wide">送る</button>
+      <p class="note" id="fb-msg" hidden></p>
+
+      <h3>これまでの意見</h3>
+      <ul class="fb-list" id="fb-list"></ul>
+    </div>
   </div>
 </div>
 

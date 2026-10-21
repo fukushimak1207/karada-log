@@ -20,3 +20,6 @@ apikey*
 
 # ローカルのプレビュー設定
 .claude/
+
+# wrangler(ローカル検証)の作業ファイル
+.wrangler/

@@ -260,3 +260,44 @@ main { padding: 0 16px; max-width: 560px; margin: 0 auto; }
 .notice-text { margin: 0 0 4px; font-weight: 700; }
 .notice .note { margin: 0 0 10px; }
 .notice .btn-row { margin: 0; }
+
+/* 意見(フィードバック) */
+.bar-btns { display: flex; gap: 8px; }
+body.no-scroll { overflow: hidden; }
+
+.fb-back {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0, 0, 0, .45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.fb-sheet {
+  width: 100%; max-width: 640px; max-height: 88vh; overflow-y: auto;
+  background: var(--bg);
+  border-radius: 16px 16px 0 0;
+  animation: fb-up .18s ease-out;
+}
+@keyframes fb-up { from { transform: translateY(14px); opacity: .6; } to { transform: none; opacity: 1; } }
+.fb-sheet .bar { position: sticky; top: 0; border-radius: 16px 16px 0 0; }
+.fb-sheet .pad { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+.fb-sheet h3 { margin: 22px 0 8px; font-size: 1rem; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  border: 1px solid var(--line); background: var(--card); color: inherit;
+  border-radius: 999px; padding: 8px 16px; font: inherit; cursor: pointer;
+}
+.chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.field .label { display: block; margin-bottom: 6px; font-size: .9rem; opacity: .85; }
+
+.fb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fb-item { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.fb-text { margin: 0 0 6px; white-space: pre-wrap; word-break: break-word; }
+.fb-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; font-size: .82rem; opacity: .8; }
+.fb-kind { font-weight: 700; opacity: 1; }
+.fb-status { margin-left: auto; }
+.fb-status.done { color: var(--accent); font-weight: 700; }
+.fb-reply {
+  margin: 10px 0 0; padding: 10px 12px;
+  border-left: 3px solid var(--accent); background: var(--bg);
+  border-radius: 0 8px 8px 0; white-space: pre-wrap; word-break: break-word;
+}
