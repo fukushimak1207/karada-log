@@ -19,7 +19,7 @@ const LEVELS = ['easy', 'normal', 'hard'];
 const LEVEL_LABEL = { easy: 'やさしい', normal: 'ふつう', hard: 'きつい' };
 const SPARE_TO_LEVEL_UP = 2;   // 「できそう」がこの回数続いたらレベルを上げる
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v5';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v6';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -260,8 +260,26 @@ function nextPlan() {
 /* ---------- 記録する ---------- */
 
 function recordDone(video, part, level, slot) {
-  state.logs.push({ d: todayStr(), id: video.id, part, level, spare: null, slot });
+  const d = todayStr();
+  // 2本目を「実際にやった」ことを、この日のレベル上げの条件にする。
+  // 「できそう」と答えただけでやらなかった日に上がってしまうのを防ぐ。
+  const firstExtra = slot >= 2 && !logsOf(d).some(l => l.slot >= 2);
+  state.logs.push({ d, id: video.id, part, level, spare: null, slot });
+  if (firstExtra) countSpareDay(part);
   save();
+}
+
+/* その部位の「余力のあった日」を1日ぶん数え、2日たまったらレベルを上げる */
+function countSpareDay(part) {
+  if (!PARTS.includes(part)) return;
+  state.spareRun[part] = (state.spareRun[part] || 0) + 1;
+  if (state.spareRun[part] < SPARE_TO_LEVEL_UP) return;
+  const i = LEVELS.indexOf(state.levels[part] || 'easy');
+  if (i < LEVELS.length - 1) {
+    state.levels[part] = LEVELS[i + 1];
+    toast(`${PART_LABEL[part]}を「${LEVEL_LABEL[state.levels[part]]}」に上げました`);
+  }
+  state.spareRun[part] = 0;
 }
 
 function setSpare(hasSpare) {
@@ -273,26 +291,12 @@ function setSpare(hasSpare) {
   }
   if (!answered) return;
 
-  // レベルの上げ下げは「その日の1本目」の回答だけで判断する。
-  // 2本目以降も数えると、1日のうちに何段も上がってしまう。
-  if (answered.slot !== 1) { save(); return; }
-
-  const first = answered;
-  const part = PARTS.includes(first.part) ? first.part : null;
-  if (part) {
-    if (hasSpare) {
-      state.spareRun[part] = (state.spareRun[part] || 0) + 1;
-      if (state.spareRun[part] >= SPARE_TO_LEVEL_UP) {
-        const i = LEVELS.indexOf(state.levels[part] || 'easy');
-        if (i < LEVELS.length - 1) {
-          state.levels[part] = LEVELS[i + 1];
-          toast(`${PART_LABEL[part]}を「${LEVEL_LABEL[state.levels[part]]}」に上げました`);
-        }
-        state.spareRun[part] = 0;
-      }
-    } else {
-      state.spareRun[part] = 0;
-    }
+  // レベルを上げるのは「2本目を実際にやった日」だけ(recordDone で数える)。
+  // ここでは「ここまで」と答えたときの据え置き(積み上がりを戻す)だけを見る。
+  // 1本目の回答だけを見るのは、1日に何段も上がらないようにするため。
+  if (answered.slot === 1 && !hasSpare) {
+    const part = PARTS.includes(answered.part) ? answered.part : null;
+    if (part) state.spareRun[part] = 0;
   }
   save();
 }
