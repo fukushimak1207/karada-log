@@ -1,5 +1,10 @@
 /* からだログ — スマホで片手で押せることを優先した配色・サイズ */
 
+/* hidden 属性を必ず効かせる。
+ * これが無いと、display を指定した要素(意見シートなど)が hidden でも出てしまう。
+ * CSS の指定はブラウザ既定の [hidden]{display:none} より強いため。 */
+[hidden] { display: none !important; }
+
 :root {
   --bg: #f3f7f6;
   --card: #ffffff;
