@@ -781,7 +781,8 @@ function fbMerge(server) {
 async function fbFetchList() {
   if (!fbState.aikotoba) return;
   try {
-    const r = await fetch(`${FB_API}?aikotoba=${encodeURIComponent(fbState.aikotoba)}`, { cache: 'no-store' });
+    // 合言葉は URL に載せない(通信記録やブラウザの履歴に残るため)。ヘッダーで送る
+    const r = await fetch(FB_API, { cache: 'no-store', headers: { 'X-Aikotoba': fbState.aikotoba } });
     const data = await r.json();
     if (!data.ok) { fbMsg(data.error || '一覧を取れませんでした'); return; }
     fbState.sent = fbMerge(data.items).slice(0, 50);

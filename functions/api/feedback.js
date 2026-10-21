@@ -9,7 +9,7 @@
  *
  * 必要な環境変数(Cloudflare のダッシュボードで設定する。コードにもページにも書かない)
  *   GITHUB_FEEDBACK_TOKEN … Issues の読み書きだけを許可した GitHub の鍵
- *   FEEDBACK_SECRET       … 合言葉。アプリが送ってきた値とここで照合する
+ *   FEEDBACK_AIKOTOBA       … 合言葉。アプリが送ってきた値とここで照合する
  *
  * 合言葉がある理由: このアプリにはログインが無いので、
  * これが無いと誰でも Issue を立てられてしまう。
@@ -44,7 +44,7 @@ function json(obj, status) {
 }
 
 function configured(env) {
-  return Boolean(env.GITHUB_FEEDBACK_TOKEN && env.FEEDBACK_SECRET);
+  return Boolean(env.GITHUB_FEEDBACK_TOKEN && env.FEEDBACK_AIKOTOBA);
 }
 
 // 合言葉の照合。長さが違っても早く抜けないようにして、総当たりの手がかりを減らす
@@ -121,8 +121,8 @@ async function ensureLabels(env, kind) {
 
 async function handleGet(request, env) {
   if (!configured(env)) return json({ ok: false, error: 'まだ設定が済んでいません' }, 503);
-  const url = new URL(request.url);
-  if (!aikotobaOk(url.searchParams.get('aikotoba'), env.FEEDBACK_SECRET)) {
+  // 合言葉はヘッダーで受け取る。URL に載せると通信記録に残ってしまう
+  if (!aikotobaOk(request.headers.get('X-Aikotoba'), env.FEEDBACK_AIKOTOBA)) {
     return json({ ok: false, error: '合言葉が違います' }, 401);
   }
 
@@ -166,7 +166,7 @@ async function handlePost(request, env) {
   let body;
   try { body = await request.json(); } catch (e) { return json({ ok: false, error: '形式が違います' }, 400); }
 
-  if (!aikotobaOk(body.aikotoba, env.FEEDBACK_SECRET)) {
+  if (!aikotobaOk(body.aikotoba, env.FEEDBACK_AIKOTOBA)) {
     return json({ ok: false, error: '合言葉が違います' }, 401);
   }
 
