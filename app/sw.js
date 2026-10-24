@@ -2,7 +2,7 @@
  * アプリのファイルを端末にキャッシュして、通信がなくても開けるようにする。
  * ファイルを更新したら CACHE_VERSION の数字を上げること。上げないと古い画面が出続ける。
  */
-const CACHE_VERSION = 'karadalog-cf-v8';
+const CACHE_VERSION = 'karadalog-cf-v9';
 const ASSETS = [
   './',
   './index.html',

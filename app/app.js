@@ -14,17 +14,18 @@ const STORE_KEY = 'karadalog.v1';
  * 目標が「筋肉を増やす」なので、体で一番大きい下半身から始め、全身の日を挟んで
  * 下半身と上半身に当たる回数を増やす。厚労省ガイドも大きな筋群をまんべんなく鍛えることを勧めている。 */
 const PARTS = ['lower', 'upper', 'full', 'core'];
-const PART_LABEL = { upper: '上半身', lower: '下半身', core: '体幹', full: '全身', warmup: 'ウォームアップ' };
+const PART_LABEL = { upper: '上半身', lower: '下半身', core: '体幹', full: '全身', warmup: 'ウォームアップ', stretch: 'ストレッチ' };
 const LEVELS = ['easy', 'normal', 'hard'];
 const LEVEL_LABEL = { easy: 'やさしい', normal: 'ふつう', hard: 'きつい' };
 const SPARE_TO_LEVEL_UP = 2;   // 「できそう」がこの回数続いたらレベルを上げる
 /* 1日にやる本数。1本目=部位のローテ、2本目=体幹(体幹の日は上半身の手薄なところ)。
  * 腹筋を増やしたいという本人の希望で、2026-10-21 に1本立てから変えた。 */
-const PLAN_SLOTS = 2;
+const PLAN_SLOTS = 3;   // 3本目はストレッチ(2026-10-24 追加。長座で腰が曲がるため)
+const STRETCH_SLOT = 3;
 const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回まで
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v8';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v9';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -87,6 +88,10 @@ const DEFAULT_VIDEOS = [
   { id: 'qhO8aBENLjk', name: 'ローラー 腹直筋と腹斜筋 8分', len: '8:32', part: 'core', sub: 'ローラー', level: 'hard' },
 
   { id: 'fZJO5hYB0Tc', name: 'ウォーミングアップ（動的ストレッチ）', len: '9:20', part: 'warmup', sub: '準備運動', level: 'easy' },
+
+  // ストレッチ。3本目に毎日出す。長座で腰が曲がる(股関節まわりが硬い)ため。
+  { id: '-Y5bOC_ecB0', name: '股関節が超硬い人向け 毎日9分', len: '9:35', part: 'stretch', sub: '股関節', level: 'easy' },
+  { id: 'cJXY4ghyRyc', name: '長座が辛い・前屈で骨盤が立たない人へ', len: '15:55', part: 'stretch', sub: '長座・前屈', level: 'easy' },
 ];
 
 /* ---------- 日付 ---------- */
@@ -318,6 +323,13 @@ function planFor(slot) {
   }
   const d = todayStr();
   const done = logsOf(d).map(l => l.id);
+
+  // 3本目はストレッチで固定
+  if (slot === STRETCH_SLOT) {
+    const sv = pickVideo('stretch', 'easy', done);
+    return sv ? { video: sv, part: 'stretch', level: sv.level } : null;
+  }
+
   const mainPart = (logsOf(d).find(l => l.slot === 1) || {}).part || nextPart();
   const part = mainPart === 'core' ? 'upper' : 'core';
   const level = state.levels[part] || 'easy';
@@ -498,9 +510,11 @@ function cardHtml(plan, slot) {
         <a class="btn primary" href="${ytUrl(v.id)}" target="_blank" rel="noopener">動画を開く</a>
         <button class="btn" data-done="${slot}" data-id="${escapeHtml(v.id)}" data-part="${plan.part}" data-level="${v.level}">やった</button>
       </div>
-      <p class="note">${v.sub === ROLLER_SUB
-        ? '<strong>膝をついたまま（膝コロ）で。</strong>腰が反ると痛めます。できる回数で止めてください。'
-        : '動画の回数で止めず、<strong>できなくなるところまで</strong>。筋肉を増やすにはここが効きます。'}</p>
+      <p class="note">${plan.part === 'stretch'
+        ? '<strong>痛いところまで伸ばさない。</strong>気持ちよく伸びる手前で止めて、呼吸を止めないでください。'
+        : (v.sub === ROLLER_SUB
+          ? '<strong>膝をついたまま（膝コロ）で。</strong>腰が反ると痛めます。できる回数で止めてください。'
+          : '動画の回数で止めず、<strong>できなくなるところまで</strong>。筋肉を増やすにはここが効きます。')}</p>
       <div class="btn-row sub-row">
         <button class="btn small" data-swap="${slot}" data-id="${escapeHtml(v.id)}">別のにする</button>
         <button class="btn small" data-mute="${slot}" data-id="${escapeHtml(v.id)}">もう出さない</button>
