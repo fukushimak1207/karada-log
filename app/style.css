@@ -315,3 +315,7 @@ body.no-scroll { overflow: hidden; }
   border: 1px solid var(--line); border-radius: 10px;
 }
 #fb-aikotoba-field { border-left: 4px solid var(--accent); padding-left: 12px; }
+
+/* カードの小さいボタン(別のにする・もう出さない) */
+.sub-row { margin-top: 10px; gap: 8px; }
+.btn.small { padding: 8px 12px; font-size: .86rem; flex: 1; }

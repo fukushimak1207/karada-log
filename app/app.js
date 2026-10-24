@@ -24,7 +24,7 @@ const PLAN_SLOTS = 2;
 const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回まで
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v7';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v8';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -45,10 +45,10 @@ const DEFAULT_VIDEOS = [
 
   // 背中と腕の補充(CALISLIFE自重トレ)。きんにくTV は背中1本・腕1本しか無く、
   // 器具なしで「引く」種目が作れないため。タオルは家にあるので追加購入は不要。
-  { id: 'IgwjbjOAxQk', name: 'タオルで背中全体 6分', len: '6:04', part: 'upper', sub: '背中', level: 'easy' },
+  { id: 'IgwjbjOAxQk', name: 'タオルで背中全体 6分', len: '6:04', part: 'upper', sub: '背中', level: 'easy', on: false },
   { id: 'Q-LGg-58_ZU', name: '背筋7種目 器具なし 6分', len: '6:18', part: 'upper', sub: '背中', level: 'normal' },
   { id: 'fk1fw8ERt7E', name: '背筋100回 9種目 6分', len: '6:50', part: 'upper', sub: '背中', level: 'hard' },
-  { id: 'UHn8wAbY0L0', name: 'タオルで上腕二頭筋', len: '4:46', part: 'upper', sub: '腕', level: 'easy' },
+  { id: 'UHn8wAbY0L0', name: 'タオルで上腕二頭筋', len: '4:46', part: 'upper', sub: '腕', level: 'easy', on: false },
   { id: 'DGdaX4PqoLg', name: '上腕三頭筋 4種目', len: '4:50', part: 'upper', sub: '腕', level: 'normal' },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
@@ -82,7 +82,7 @@ const DEFAULT_VIDEOS = [
 
   // 腹筋ローラー。持っているのに使う動画が無かったので足す。
   // sub が ROLLER_SUB のものは、腰を痛めないよう2日に1回までしか出さない。
-  { id: 'Z-h6_7In8G0', name: 'ローラー 安全な使い方とフォーム', len: '4:41', part: 'core', sub: 'ローラー', level: 'easy' },
+  { id: 'Z-h6_7In8G0', name: 'ローラー 安全な使い方とフォーム', len: '4:41', part: 'core', sub: 'ローラー', level: 'easy', once: true },
   { id: 'q2p3JUSlwXo', name: 'ローラー 腹筋5種目（世界チャンプ直伝）', len: '5:58', part: 'core', sub: 'ローラー', level: 'normal' },
   { id: 'qhO8aBENLjk', name: 'ローラー 腹直筋と腹斜筋 8分', len: '8:32', part: 'core', sub: 'ローラー', level: 'hard' },
 
@@ -137,7 +137,7 @@ const defaultState = () => ({
   levels: { lower: 'easy', upper: 'easy', full: 'easy', core: 'easy' },
   spareRun: { lower: 0, upper: 0, full: 0, core: 0 },
   videos: null,                                       // 編集したときだけ配列が入る
-  todayPick: null,                                    // {d, id} 手動で選んだ今日の動画
+  todayPick: null,                                    // {d, ids:{slot:id}} 手で選んだ今日の動画
   lastExport: null,
   measure: { weekday: 0, last: null },                // 測る曜日(既定は日曜)と、最後に測った日
   evalSeen: false,                                    // 評価日の知らせを確認したか
@@ -179,7 +179,7 @@ function save() {
 }
 
 function videos() {
-  return (state.videos && state.videos.length) ? state.videos : DEFAULT_VIDEOS.map(v => ({ ...v, on: true }));
+  return (state.videos && state.videos.length) ? state.videos : DEFAULT_VIDEOS.map(v => ({ ...v, on: v.on !== false }));
 }
 
 /* ---------- 今日やることを決める ---------- */
@@ -229,8 +229,12 @@ function rollerOk(d) {
 }
 
 function pickVideo(part, level, excludeIds) {
-  let pool = videos().filter(v => v.on !== false && v.part === part);
+  // once の動画(フォーム解説など)は、一度やったらもう出さない。
+  // 解説だけで回数が無いので、繰り返し出ると練習にならないため。
+  const didOnce = new Set(state.logs.map(l => l.id));
+  let pool = videos().filter(v => v.on !== false && v.part === part && !(v.once && didOnce.has(v.id)));
   if (!rollerOk()) pool = pool.filter(v => v.sub !== ROLLER_SUB);
+  if (!pool.length) pool = videos().filter(v => v.on !== false && v.part === part && !(v.once && didOnce.has(v.id)));
   if (!pool.length) pool = videos().filter(v => v.on !== false && v.part === part);
   if (!pool.length) return null;
 
@@ -264,10 +268,30 @@ function findVideo(id) {
 }
 
 // 今日の1本目
+/* 手で選んだ動画の取り出し。古い保存データ({d,id})にも対応する */
+function pickedId(slot) {
+  const p = state.todayPick;
+  if (!p || p.d !== todayStr()) return null;
+  if (p.ids) return p.ids[String(slot)] || null;
+  return slot === 1 ? (p.id || null) : null;   // 1本立てだった頃のデータ
+}
+
+function setPicked(slot, id) {
+  const d = todayStr();
+  if (!state.todayPick || state.todayPick.d !== d || !state.todayPick.ids) {
+    const old = (state.todayPick && state.todayPick.d === d && state.todayPick.id)
+      ? { '1': state.todayPick.id } : {};
+    state.todayPick = { d, ids: old };
+  }
+  state.todayPick.ids[String(slot)] = id;
+  save();
+}
+
 function todaysPlan() {
   const d = todayStr();
-  if (state.todayPick && state.todayPick.d === d) {
-    const v = findVideo(state.todayPick.id);
+  const picked = pickedId(1);
+  if (picked) {
+    const v = findVideo(picked);
     if (v) return { video: v, part: v.part, level: v.level };
   }
   const part = nextPart();
@@ -287,6 +311,11 @@ function todaysPlan() {
  * PLAN_SLOTS を超えた分は nextPlan()(余力があるときの追加)が決める。 */
 function planFor(slot) {
   if (slot <= 1) return todaysPlan();
+  const picked = pickedId(slot);
+  if (picked) {
+    const pv = findVideo(picked);
+    if (pv) return { video: pv, part: pv.part, level: pv.level };
+  }
   const d = todayStr();
   const done = logsOf(d).map(l => l.id);
   const mainPart = (logsOf(d).find(l => l.slot === 1) || {}).part || nextPart();
@@ -472,6 +501,10 @@ function cardHtml(plan, slot) {
       <p class="note">${v.sub === ROLLER_SUB
         ? '<strong>膝をついたまま（膝コロ）で。</strong>腰が反ると痛めます。できる回数で止めてください。'
         : '動画の回数で止めず、<strong>できなくなるところまで</strong>。筋肉を増やすにはここが効きます。'}</p>
+      <div class="btn-row sub-row">
+        <button class="btn small" data-swap="${slot}" data-id="${escapeHtml(v.id)}">別のにする</button>
+        <button class="btn small" data-mute="${slot}" data-id="${escapeHtml(v.id)}">もう出さない</button>
+      </div>
     </div>`;
 }
 
@@ -509,8 +542,11 @@ function render() {
   // 今日やること = 決められた本数(PLAN_SLOTS)。やった分は記録カードに変わる
   const cards = [];
   shownPlan = null;
-  for (let slot = 1; slot <= Math.max(PLAN_SLOTS, today.length); slot++) {
-    const log = today[slot - 1];
+  // 記録は slot で突き合わせる。並び順で見ると、先に2本目をやったときに
+  // 1本目の枠が消えてしまう(意見 #11)。
+  const maxSlot = today.reduce((m, l) => Math.max(m, l.slot || 1), PLAN_SLOTS);
+  for (let slot = 1; slot <= maxSlot; slot++) {
+    const log = today.find(l => l.slot === slot);
     if (log) { cards.push(doneCardHtml(log)); continue; }
     const plan = planFor(slot);
     if (!shownPlan) shownPlan = plan;            // 意見に添える情報は「次にやる分」を使う
@@ -527,7 +563,7 @@ function render() {
 
   // 追加の1本 → 決められた分を終えたあと「できそう」と答えたとき
   if (last && last.spare === true && planDone) {
-    const n = today.length + 1;
+    const n = today.reduce((m, l) => Math.max(m, l.slot || 1), 0) + 1;
     const plan = nextPlan();
     $('#second-area').hidden = false;
     $('#second-title').textContent = `追加の1本（${n}本目）`;
@@ -683,7 +719,7 @@ function renderVideoList() {
 
 function ensureVideosCopy() {
   if (!state.videos || !state.videos.length) {
-    state.videos = DEFAULT_VIDEOS.map(v => ({ ...v, on: true }));
+    state.videos = DEFAULT_VIDEOS.map(v => ({ ...v, on: v.on !== false }));
   }
   return state.videos;
 }
@@ -910,6 +946,40 @@ async function fbSend() {
   }
 }
 
+/* 今出ている動画を別のものに替える。mute なら、その動画を以後出さない(設定で戻せる)。 */
+function swapVideo(slot, id, mute) {
+  const cur = findVideo(id);
+  if (!cur) return;
+
+  if (mute) {
+    const list = ensureVideosCopy();
+    const target = list.find(v => v.id === id);
+    if (target) target.on = false;
+  }
+
+  const used = logsOf(todayStr()).map(l => l.id).concat([id]);
+  const level = state.levels[cur.part] || 'easy';
+  const next = pickVideo(cur.part, level, used);
+
+  if (!next || next.id === id) {
+    if (mute) { save(); render(); toast('もう出しません。設定の「動画リスト」で戻せます'); }
+    else toast('ほかに出せる動画がありません');
+    return;
+  }
+
+  setPicked(slot, next.id);   // setPicked の中で保存する
+  render();
+
+  if (mute) {
+    const left = videos().filter(v => v.on !== false && v.part === cur.part).length;
+    toast(left <= 2
+      ? `もう出しません。${PART_LABEL[cur.part]}の残りは${left}本です`
+      : 'もう出しません。設定の「動画リスト」で戻せます');
+  } else {
+    toast('別の動画にしました');
+  }
+}
+
 /* ---------- 画面の操作 ---------- */
 
 function bind() {
@@ -938,6 +1008,14 @@ function bind() {
       save();
       render();
     }
+  });
+
+  // 合わない動画をその場で外す(意見 #7)
+  document.addEventListener('click', ev => {
+    const swap = ev.target.closest('[data-swap]');
+    if (swap) { swapVideo(Number(swap.dataset.swap), swap.dataset.id, false); return; }
+    const mute = ev.target.closest('[data-mute]');
+    if (mute) { swapVideo(Number(mute.dataset.mute), mute.dataset.id, true); }
   });
 
   $('#btn-spare-yes').addEventListener('click', () => { setSpare(true); render(); });
@@ -992,7 +1070,7 @@ function bind() {
       toast('今日はもう記録済みです。消してから変えてください');
       return;
     }
-    state.todayPick = { d: todayStr(), id };
+    setPicked(1, id);
     save();
     toast('今日の動画を変えました');
     $('#settings').hidden = true;
