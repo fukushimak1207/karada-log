@@ -319,3 +319,10 @@ body.no-scroll { overflow: hidden; }
 /* カードの小さいボタン(別のにする・もう出さない) */
 .sub-row { margin-top: 10px; gap: 8px; }
 .btn.small { padding: 8px 12px; font-size: .86rem; flex: 1; }
+
+/* アプリの中での再生 */
+.player { margin: 12px 0; }
+.player .play { margin: 0; }
+.frame { position: relative; width: 100%; aspect-ratio: 16 / 9; margin-bottom: 10px; }
+.frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 10px; }
+.btn.wide.small { width: 100%; }

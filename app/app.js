@@ -25,7 +25,7 @@ const STRETCH_SLOT = 3;
 const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回まで
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v9';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v10';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -37,11 +37,11 @@ const EVAL_DATE = '2027-01-18';    // 3か月後に筋肉量と筋肉スコア�
  */
 const DEFAULT_VIDEOS = [
   // 上半身 — sub で胸→背中→肩→腕と内部でまわす(胸が2本あるので、放っておくと偏る)
-  { id: 'PquP1dO3uKg', name: '大胸筋 7種目3分半', len: '15:17', part: 'upper', sub: '胸', level: 'normal' },
+  { id: 'PquP1dO3uKg', name: '大胸筋 7種目3分半', len: '15:17', part: 'upper', sub: '胸', level: 'normal' , start: 553 },
   { id: 'RIqa_JtJ3jk', name: '胸＆腹筋 10種目5分', len: '11:05', part: 'upper', sub: '胸', level: 'easy' },
-  { id: 'al3CoAGcrTE', name: '背筋 8種目4分（器具なし）', len: '14:45', part: 'upper', sub: '背中', level: 'normal' },
-  { id: 'DAI9IcAxfPA', name: '肩（三角筋）7種目4分', len: '16:27', part: 'upper', sub: '肩', level: 'normal' },
-  { id: 'yjTD95S3TUc', name: '二の腕＆力こぶ 7種目4分半', len: '15:33', part: 'upper', sub: '腕', level: 'easy' },
+  { id: 'al3CoAGcrTE', name: '背筋 8種目4分（器具なし）', len: '14:45', part: 'upper', sub: '背中', level: 'normal' , start: 569 },
+  { id: 'DAI9IcAxfPA', name: '肩（三角筋）7種目4分', len: '16:27', part: 'upper', sub: '肩', level: 'normal' , start: 654 },
+  { id: 'yjTD95S3TUc', name: '二の腕＆力こぶ 7種目4分半', len: '15:33', part: 'upper', sub: '腕', level: 'easy' , start: 603 },
   { id: 'LARsdRVCvHU', name: '上半身6分（ペットボトルでも可）', len: '13:45', part: 'upper', sub: '上半身まとめて', level: 'normal' },
 
   // 背中と腕の補充(CALISLIFE自重トレ)。きんにくTV は背中1本・腕1本しか無く、
@@ -53,8 +53,8 @@ const DEFAULT_VIDEOS = [
   { id: 'DGdaX4PqoLg', name: '上腕三頭筋 4種目', len: '4:50', part: 'upper', sub: '腕', level: 'normal' },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
-  { id: 'BFitLouawaM', name: '脚 7種目3分半（初級）', len: '15:15', part: 'lower', sub: '太もも', level: 'easy' },
-  { id: 'OlGiInYmSiw', name: 'レッグランジ 4種目3分', len: '10:57', part: 'lower', sub: 'ランジ', level: 'easy' },
+  { id: 'BFitLouawaM', name: '脚 7種目3分半（初級）', len: '15:15', part: 'lower', sub: '太もも', level: 'easy' , start: 638 },
+  { id: 'OlGiInYmSiw', name: 'レッグランジ 4種目3分', len: '10:57', part: 'lower', sub: 'ランジ', level: 'easy' , start: 412 },
   { id: 'eqZoAgF5Hkw', name: 'お尻 7種目4分半', len: '15:48', part: 'lower', sub: 'お尻', level: 'normal' },
   { id: 'tkRfK1dr15o', name: 'お尻＆内もも 10分', len: '15:52', part: 'lower', sub: 'お尻', level: 'normal' },
   { id: 'oalL5-xQeNg', name: '下半身 9種目6分（中級）', len: '14:24', part: 'lower', sub: '下半身まとめて', level: 'normal' },
@@ -75,7 +75,7 @@ const DEFAULT_VIDEOS = [
   { id: 'cQsupVhKcDg', name: 'HIIT 高強度 全身7分半', len: '11:52', part: 'full', sub: 'HIIT', level: 'hard' },
 
   // 体幹 — 筋肉量への寄与は小さいので4日に1回
-  { id: 'u-wS8jABqQI', name: '腹筋 7種類3分半', len: '12:33', part: 'core', sub: '腹筋', level: 'easy' },
+  { id: 'u-wS8jABqQI', name: '腹筋 7種類3分半', len: '12:33', part: 'core', sub: '腹筋', level: 'easy' , start: 197 },
   { id: 'XpoJfzAMneY', name: '腹斜筋 7種目4分', len: '13:39', part: 'core', sub: '脇腹', level: 'easy' },
   { id: '590CWWrC4PM', name: 'プランク 7種目4分', len: '13:24', part: 'core', sub: 'プランク', level: 'normal' },
   { id: 'o5vb430_m38', name: '下腹部＆くびれ 10種目10分', len: '10:50', part: 'core', sub: '下腹', level: 'normal' },
@@ -146,6 +146,7 @@ const defaultState = () => ({
   lastExport: null,
   measure: { weekday: 0, last: null },                // 測る曜日(既定は日曜)と、最後に測った日
   evalSeen: false,                                    // 評価日の知らせを確認したか
+  starts: {},                                         // {動画ID: 秒} 運動が始まる位置。覚えさせた分
   goal: '',                                           // 目標の数値。端末内にだけ置く(公開コードに入れない)
 });
 
@@ -168,6 +169,7 @@ function load() {
     const wd = Number(state.measure.weekday);
     state.measure.weekday = (Number.isInteger(wd) && wd >= 0 && wd <= 6) ? wd : 0;
     if (typeof state.measure.last !== 'string') state.measure.last = null;
+    if (!state.starts || typeof state.starts !== 'object') state.starts = {};
   } catch (e) {
     console.warn('保存データを読めなかったので初期状態で始めます', e);
     state = defaultState();
@@ -489,7 +491,31 @@ function toast(msg) {
   toast._t = setTimeout(() => { el.hidden = true; }, 2600);
 }
 
-function ytUrl(id) { return `https://www.youtube.com/watch?v=${id}`; }
+/* 運動が始まる位置(秒)。覚えさせた分があればそれを使う。
+ * 既定値は自動生成字幕から求めたもの(いちばん長い[音楽]だけの区間の先頭)。 */
+function startOf(id) {
+  const mine = state.starts && state.starts[id];
+  if (typeof mine === 'number' && mine >= 0) return mine;
+  const v = findVideo(id);
+  return (v && typeof v.start === 'number') ? v.start : 0;
+}
+
+function fmtSec(sec) {
+  const m = Math.floor(sec / 60), r = Math.floor(sec % 60);
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+function ytUrl(id) {
+  const t = startOf(id);
+  return `https://www.youtube.com/watch?v=${id}` + (t > 0 ? `&t=${t}s` : '');
+}
+
+// アプリの中で再生するための URL
+function ytEmbed(id) {
+  const t = startOf(id);
+  return `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=1&enablejsapi=1`
+    + (t > 0 ? `&start=${t}` : '');
+}
 
 function cardHtml(plan, slot) {
   const v = plan.video;
@@ -506,8 +532,13 @@ function cardHtml(plan, slot) {
       </div>
       <p class="vtitle">${escapeHtml(v.name)}</p>
       <p class="vmeta">動画 ${escapeHtml(v.len)}（解説を含む長さ）</p>
+      <div class="player" data-player="${escapeHtml(v.id)}">
+        <button class="btn primary wide play" data-play="${escapeHtml(v.id)}">
+          ${startOf(v.id) > 0 ? `${escapeHtml(fmtSec(startOf(v.id)))} から再生` : 'ここで再生'}
+        </button>
+      </div>
       <div class="btn-row">
-        <a class="btn primary" href="${ytUrl(v.id)}" target="_blank" rel="noopener">動画を開く</a>
+        <a class="btn" href="${ytUrl(v.id)}" target="_blank" rel="noopener">YouTubeで開く</a>
         <button class="btn" data-done="${slot}" data-id="${escapeHtml(v.id)}" data-part="${plan.part}" data-level="${v.level}">やった</button>
       </div>
       <p class="note">${plan.part === 'stretch'
@@ -994,6 +1025,34 @@ function swapVideo(slot, id, mute) {
   }
 }
 
+/* 再生位置の受け取り。
+ * 埋め込みプレーヤーは enablejsapi=1 のとき、現在位置を postMessage で知らせてくる。
+ * YouTube の API スクリプトは読み込まない(外部依存を増やさないため)。 */
+const playerTime = {};
+let playingId = null;
+
+function watchPlayer(iframe, id) {
+  playingId = id;
+  const tell = () => {
+    try {
+      iframe.contentWindow.postMessage(JSON.stringify({ event: 'listening', id }), '*');
+    } catch (e) { /* 準備前は届かない。次の呼び出しで届く */ }
+  };
+  iframe.addEventListener('load', tell);
+  const timer = setInterval(tell, 1000);
+  setTimeout(() => clearInterval(timer), 20000);
+}
+
+window.addEventListener('message', ev => {
+  let host = '';
+  try { host = new URL(ev.origin).hostname; } catch (e) { return; }
+  if (!/(^|\.)youtube(-nocookie)?\.com$/.test(host)) return;   // YouTube 以外は無視
+  let d;
+  try { d = JSON.parse(ev.data); } catch (e) { return; }
+  const t = d && d.info && d.info.currentTime;
+  if (typeof t === 'number' && playingId) playerTime[playingId] = t;
+});
+
 /* ---------- 画面の操作 ---------- */
 
 function bind() {
@@ -1022,6 +1081,37 @@ function bind() {
       save();
       render();
     }
+  });
+
+  // アプリの中で再生する。YouTube に飛ばずに済ませるため。
+  document.addEventListener('click', ev => {
+    const play = ev.target.closest('[data-play]');
+    if (!play) return;
+    const id = play.dataset.play;
+    const box = play.closest('[data-player]');
+    if (!box) return;
+    box.innerHTML = `
+      <div class="frame">
+        <iframe src="${ytEmbed(id)}" title="動画" allow="autoplay; fullscreen; picture-in-picture"
+          allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </div>
+      <button class="btn small wide" data-mark="${escapeHtml(id)}">いまのところを開始位置にする</button>
+      <p class="note">解説を飛ばして運動が始まったところで押すと、次から そこで始まります。</p>`;
+    const frame = box.querySelector('iframe');
+    if (frame) watchPlayer(frame, id);
+  });
+
+  // 「いまのところを開始位置にする」。再生位置はプレーヤーから受け取る
+  document.addEventListener('click', ev => {
+    const mark = ev.target.closest('[data-mark]');
+    if (!mark) return;
+    const id = mark.dataset.mark;
+    const sec = Math.floor(playerTime[id] || 0);
+    if (!sec) { toast('まだ再生位置を受け取れていません。少し再生してから押してください'); return; }
+    state.starts[id] = sec;
+    save();
+    render();
+    toast(`次から ${fmtSec(sec)} から始まります`);
   });
 
   // 合わない動画をその場で外す(意見 #7)
