@@ -331,3 +331,40 @@ body.no-scroll { overflow: hidden; }
 .gear-line { margin: 4px 0 0; font-size: .9rem; }
 .gear-box { margin: 10px 0; padding: 10px 12px; background: var(--bg); border-radius: 10px; }
 .gear-box .note { margin: 0 0 8px; }
+
+/* やる種目のリスト(意見 #14)。データが入っている動画だけ出る */
+.items {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.items-head {
+  margin: 0 0 6px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ink-sub);
+}
+.items ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.items li {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+.items .seek {
+  margin-right: 8px;
+  padding: 1px 7px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.items .note {
+  margin: 8px 0 0;
+}

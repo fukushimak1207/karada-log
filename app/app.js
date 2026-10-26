@@ -28,7 +28,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v11';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v12';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -56,7 +56,7 @@ const DEFAULT_VIDEOS = [
   { id: 'DGdaX4PqoLg', name: '上腕三頭筋 4種目', len: '4:50', part: 'upper', sub: '腕', level: 'normal' },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
-  { id: 'BFitLouawaM', name: '脚 7種目3分半（初級）', len: '15:15', part: 'lower', sub: '太もも', level: 'easy' , start: 638 },
+  { id: 'BFitLouawaM', name: '脚 7種目3分半（初級）', len: '15:15', part: 'lower', sub: '太もも', level: 'easy' , start: 638  },
   { id: 'OlGiInYmSiw', name: 'レッグランジ 4種目3分', len: '10:57', part: 'lower', sub: 'ランジ', level: 'easy' , start: 412 },
   { id: 'eqZoAgF5Hkw', name: 'お尻 7種目4分半', len: '15:48', part: 'lower', sub: 'お尻', level: 'normal' },
   { id: 'tkRfK1dr15o', name: 'お尻＆内もも 10分', len: '15:52', part: 'lower', sub: 'お尻', level: 'normal' },
@@ -505,6 +505,17 @@ function startOf(id) {
   return (v && typeof v.start === 'number') ? v.start : 0;
 }
 
+/* その動画でやる種目。{ t: 秒, name: '種目名' } の並び。
+ * t があるとその位置へ飛べる。データが無い動画は空(画面には何も出さない)。
+ * 種目名は動画のテロップから書き写したもので、概要欄や字幕からは取れなかった。 */
+function itemsOf(id) {
+  const v = findVideo(id);
+  const raw = (v && Array.isArray(v.items)) ? v.items : [];
+  return raw
+    .map(x => (typeof x === 'string' ? { name: x } : x))
+    .filter(x => x && x.name);
+}
+
 /* その動画に要る道具。覚えさせた分があればそれを使う */
 function gearOf(id) {
   const mine = state.gear && state.gear[id];
@@ -548,6 +559,17 @@ function cardHtml(plan, slot) {
     return `<div class="card"><p class="vtitle">動画がありません</p>
       <p class="note">設定の「動画リスト」で、この部位の動画を1つ以上オンにしてください。</p></div>`;
   }
+  const items = itemsOf(v.id);
+  const itemsHtml = items.length ? `
+      <div class="items">
+        <p class="items-head">やる種目（${items.length}つ）</p>
+        <ol>
+          ${items.map(it => `<li>${typeof it.t === 'number'
+            ? `<button type="button" class="seek" data-seek="${it.t}" data-seek-id="${escapeHtml(v.id)}">${escapeHtml(fmtSec(it.t))}</button>`
+            : ''}<span>${escapeHtml(it.name)}</span></li>`).join('')}
+        </ol>
+        <p class="note">時間を押すと、再生中の動画がその種目まで飛びます。</p>
+      </div>` : '';
   return `
     <div class="card">
       <div class="part-row">
@@ -560,6 +582,7 @@ function cardHtml(plan, slot) {
       ${gearOf(v.id).length
         ? `<p class="gear-line">要るもの：<strong>${escapeHtml(gearOf(v.id).join('・'))}</strong></p>`
         : ''}
+      ${itemsHtml}
       <div class="gear-box" hidden data-gearbox="${escapeHtml(v.id)}">
         <p class="note">この動画に要るものを選んでください（複数可）。</p>
         <div class="chips">
@@ -1165,6 +1188,23 @@ function bind() {
     save();
     render();
     toast(`次から ${fmtSec(sec)} から始まります`);
+  });
+
+  // 種目の時間を押したら、再生中の動画をその位置へ飛ばす
+  document.addEventListener('click', ev => {
+    const s = ev.target.closest('[data-seek]');
+    if (!s) return;
+    const id = s.dataset.seekId;
+    const t = Number(s.dataset.seek);
+    const frame = document.querySelector(`[data-player="${id}"] iframe`);
+    if (!frame) { toast('先に「再生」を押してください'); return; }
+    try {
+      frame.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: 'seekTo', args: [t, true] }), '*');
+      toast(`${fmtSec(t)} へ飛びました`);
+    } catch (e) {
+      toast('いまは飛べません。少し再生してから押してください');
+    }
   });
 
   // 必要な道具を覚えさせる(意見 #13)
