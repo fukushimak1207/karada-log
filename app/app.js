@@ -23,9 +23,12 @@ const SPARE_TO_LEVEL_UP = 2;   // 「できそう」がこの回数続いたら�
 const PLAN_SLOTS = 3;   // 3本目はストレッチ(2026-10-24 追加。長座で腰が曲がるため)
 const STRETCH_SLOT = 3;
 const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回まで
+/* 必要な道具。動画の概要欄は当てにならなかった(他の動画の宣伝文が混ざる)ので、
+ * 確実なものだけ先に入れ、残りは使ったときに本人が覚えさせる。 */
+const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v10';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v11';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -41,15 +44,15 @@ const DEFAULT_VIDEOS = [
   { id: 'RIqa_JtJ3jk', name: '胸＆腹筋 10種目5分', len: '11:05', part: 'upper', sub: '胸', level: 'easy' },
   { id: 'al3CoAGcrTE', name: '背筋 8種目4分（器具なし）', len: '14:45', part: 'upper', sub: '背中', level: 'normal' , start: 569 },
   { id: 'DAI9IcAxfPA', name: '肩（三角筋）7種目4分', len: '16:27', part: 'upper', sub: '肩', level: 'normal' , start: 654 },
-  { id: 'yjTD95S3TUc', name: '二の腕＆力こぶ 7種目4分半', len: '15:33', part: 'upper', sub: '腕', level: 'easy' , start: 603 },
-  { id: 'LARsdRVCvHU', name: '上半身6分（ペットボトルでも可）', len: '13:45', part: 'upper', sub: '上半身まとめて', level: 'normal' },
+  { id: 'yjTD95S3TUc', name: '二の腕＆力こぶ 7種目4分半', len: '15:33', part: 'upper', sub: '腕', level: 'easy' , start: 603 , gear: ['ペットボトル'] },
+  { id: 'LARsdRVCvHU', name: '上半身6分（ペットボトルでも可）', len: '13:45', part: 'upper', sub: '上半身まとめて', level: 'normal' , gear: ['ペットボトル'] },
 
   // 背中と腕の補充(CALISLIFE自重トレ)。きんにくTV は背中1本・腕1本しか無く、
   // 器具なしで「引く」種目が作れないため。タオルは家にあるので追加購入は不要。
-  { id: 'IgwjbjOAxQk', name: 'タオルで背中全体 6分', len: '6:04', part: 'upper', sub: '背中', level: 'easy', on: false },
+  { id: 'IgwjbjOAxQk', name: 'タオルで背中全体 6分', len: '6:04', part: 'upper', sub: '背中', level: 'easy', on: false , gear: ['タオル'] },
   { id: 'Q-LGg-58_ZU', name: '背筋7種目 器具なし 6分', len: '6:18', part: 'upper', sub: '背中', level: 'normal' },
   { id: 'fk1fw8ERt7E', name: '背筋100回 9種目 6分', len: '6:50', part: 'upper', sub: '背中', level: 'hard' },
-  { id: 'UHn8wAbY0L0', name: 'タオルで上腕二頭筋', len: '4:46', part: 'upper', sub: '腕', level: 'easy', on: false },
+  { id: 'UHn8wAbY0L0', name: 'タオルで上腕二頭筋', len: '4:46', part: 'upper', sub: '腕', level: 'easy', on: false , gear: ['タオル'] },
   { id: 'DGdaX4PqoLg', name: '上腕三頭筋 4種目', len: '4:50', part: 'upper', sub: '腕', level: 'normal' },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
@@ -83,9 +86,9 @@ const DEFAULT_VIDEOS = [
 
   // 腹筋ローラー。持っているのに使う動画が無かったので足す。
   // sub が ROLLER_SUB のものは、腰を痛めないよう2日に1回までしか出さない。
-  { id: 'Z-h6_7In8G0', name: 'ローラー 安全な使い方とフォーム', len: '4:41', part: 'core', sub: 'ローラー', level: 'easy', once: true },
-  { id: 'q2p3JUSlwXo', name: 'ローラー 腹筋5種目（世界チャンプ直伝）', len: '5:58', part: 'core', sub: 'ローラー', level: 'normal' },
-  { id: 'qhO8aBENLjk', name: 'ローラー 腹直筋と腹斜筋 8分', len: '8:32', part: 'core', sub: 'ローラー', level: 'hard' },
+  { id: 'Z-h6_7In8G0', name: 'ローラー 安全な使い方とフォーム', len: '4:41', part: 'core', sub: 'ローラー', level: 'easy', once: true , gear: ['ローラー'] },
+  { id: 'q2p3JUSlwXo', name: 'ローラー 腹筋5種目（世界チャンプ直伝）', len: '5:58', part: 'core', sub: 'ローラー', level: 'normal' , gear: ['ローラー'] },
+  { id: 'qhO8aBENLjk', name: 'ローラー 腹直筋と腹斜筋 8分', len: '8:32', part: 'core', sub: 'ローラー', level: 'hard' , gear: ['ローラー'] },
 
   { id: 'fZJO5hYB0Tc', name: 'ウォーミングアップ（動的ストレッチ）', len: '9:20', part: 'warmup', sub: '準備運動', level: 'easy' },
 
@@ -147,6 +150,7 @@ const defaultState = () => ({
   measure: { weekday: 0, last: null },                // 測る曜日(既定は日曜)と、最後に測った日
   evalSeen: false,                                    // 評価日の知らせを確認したか
   starts: {},                                         // {動画ID: 秒} 運動が始まる位置。覚えさせた分
+  gear: {},                                           // {動画ID: [道具]} 覚えさせた分
   goal: '',                                           // 目標の数値。端末内にだけ置く(公開コードに入れない)
 });
 
@@ -170,6 +174,7 @@ function load() {
     state.measure.weekday = (Number.isInteger(wd) && wd >= 0 && wd <= 6) ? wd : 0;
     if (typeof state.measure.last !== 'string') state.measure.last = null;
     if (!state.starts || typeof state.starts !== 'object') state.starts = {};
+    if (!state.gear || typeof state.gear !== 'object') state.gear = {};
   } catch (e) {
     console.warn('保存データを読めなかったので初期状態で始めます', e);
     state = defaultState();
@@ -500,6 +505,26 @@ function startOf(id) {
   return (v && typeof v.start === 'number') ? v.start : 0;
 }
 
+/* その動画に要る道具。覚えさせた分があればそれを使う */
+function gearOf(id) {
+  const mine = state.gear && state.gear[id];
+  if (Array.isArray(mine)) return mine;
+  const v = findVideo(id);
+  return (v && Array.isArray(v.gear)) ? v.gear : [];
+}
+
+function setGear(id, name) {
+  const now = gearOf(id).slice();
+  if (name === 'なし') {
+    state.gear[id] = [];
+  } else {
+    const i = now.indexOf(name);
+    if (i >= 0) now.splice(i, 1); else now.push(name);
+    state.gear[id] = now;
+  }
+  save();
+}
+
 function fmtSec(sec) {
   const m = Math.floor(sec / 60), r = Math.floor(sec % 60);
   return `${m}:${String(r).padStart(2, '0')}`;
@@ -532,6 +557,15 @@ function cardHtml(plan, slot) {
       </div>
       <p class="vtitle">${escapeHtml(v.name)}</p>
       <p class="vmeta">動画 ${escapeHtml(v.len)}（解説を含む長さ）</p>
+      ${gearOf(v.id).length
+        ? `<p class="gear-line">要るもの：<strong>${escapeHtml(gearOf(v.id).join('・'))}</strong></p>`
+        : ''}
+      <div class="gear-box" hidden data-gearbox="${escapeHtml(v.id)}">
+        <p class="note">この動画に要るものを選んでください（複数可）。</p>
+        <div class="chips">
+          ${GEAR_CHOICES.map(g => `<button type="button" class="chip${gearOf(v.id).includes(g) ? ' on' : ''}" data-gear="${escapeHtml(v.id)}" data-gear-name="${escapeHtml(g)}">${escapeHtml(g)}</button>`).join('')}
+        </div>
+      </div>
       <div class="player" data-player="${escapeHtml(v.id)}">
         <button class="btn primary wide play" data-play="${escapeHtml(v.id)}">
           ${startOf(v.id) > 0 ? `${escapeHtml(fmtSec(startOf(v.id)))} から再生` : 'ここで再生'}
@@ -549,6 +583,7 @@ function cardHtml(plan, slot) {
       <div class="btn-row sub-row">
         <button class="btn small" data-swap="${slot}" data-id="${escapeHtml(v.id)}">別のにする</button>
         <button class="btn small" data-mute="${slot}" data-id="${escapeHtml(v.id)}">もう出さない</button>
+        <button class="btn small" data-gearopen="${escapeHtml(v.id)}">道具</button>
       </div>
     </div>`;
 }
@@ -594,6 +629,9 @@ function render() {
     const log = today.find(l => l.slot === slot);
     if (log) { cards.push(doneCardHtml(log)); continue; }
     const plan = planFor(slot);
+    // 一度出した分はその日のあいだ固定する。固定しないと、画面を描き直すたびに
+    // 選び直されて「今日やること」が入れ替わってしまう。
+    if (plan && plan.video && !pickedId(slot)) setPicked(slot, plan.video.id);
     if (!shownPlan) shownPlan = plan;            // 意見に添える情報は「次にやる分」を使う
     cards.push(plan
       ? cardHtml(plan, slot)
@@ -1053,6 +1091,21 @@ window.addEventListener('message', ev => {
   if (typeof t === 'number' && playingId) playerTime[playingId] = t;
 });
 
+/* 全画面になったら横向きに固定する(意見 #12)。
+ * 向きの固定は「モバイル端末で全画面のときのみ有効」(MDN)。
+ * 対応していない端末では何も起きないようにして、再生は続ける。 */
+function watchFullscreen() {
+  document.addEventListener('fullscreenchange', () => {
+    const o = screen.orientation;
+    if (!o) return;
+    if (document.fullscreenElement) {
+      if (o.lock) o.lock('landscape').catch(() => { /* 対応していなければそのまま */ });
+    } else {
+      if (o.unlock) { try { o.unlock(); } catch (e) { /* 失敗しても困らない */ } }
+    }
+  });
+}
+
 /* ---------- 画面の操作 ---------- */
 
 function bind() {
@@ -1112,6 +1165,22 @@ function bind() {
     save();
     render();
     toast(`次から ${fmtSec(sec)} から始まります`);
+  });
+
+  // 必要な道具を覚えさせる(意見 #13)
+  document.addEventListener('click', ev => {
+    const open = ev.target.closest('[data-gearopen]');
+    if (open) {
+      const box = document.querySelector(`[data-gearbox="${open.dataset.gearopen}"]`);
+      if (box) box.hidden = !box.hidden;
+      return;
+    }
+    const chip = ev.target.closest('[data-gear]');
+    if (!chip) return;
+    setGear(chip.dataset.gear, chip.dataset.gearName);
+    render();
+    const g = gearOf(chip.dataset.gear);
+    toast(g.length ? `要るもの：${g.join('・')}` : '道具なしにしました');
   });
 
   // 合わない動画をその場で外す(意見 #7)
@@ -1241,6 +1310,7 @@ function bind() {
 load();
 fbLoad();
 bind();
+watchFullscreen();
 render();
 
 if ('serviceWorker' in navigator) {

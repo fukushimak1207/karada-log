@@ -326,3 +326,8 @@ body.no-scroll { overflow: hidden; }
 .frame { position: relative; width: 100%; aspect-ratio: 16 / 9; margin-bottom: 10px; }
 .frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 10px; }
 .btn.wide.small { width: 100%; }
+
+/* 必要な道具 */
+.gear-line { margin: 4px 0 0; font-size: .9rem; }
+.gear-box { margin: 10px 0; padding: 10px 12px; background: var(--bg); border-radius: 10px; }
+.gear-box .note { margin: 0 0 8px; }
