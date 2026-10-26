@@ -40,11 +40,46 @@ const EVAL_DATE = '2027-01-18';    // 3か月後に筋肉量と筋肉スコア�
  */
 const DEFAULT_VIDEOS = [
   // 上半身 — sub で胸→背中→肩→腕と内部でまわす(胸が2本あるので、放っておくと偏る)
-  { id: 'PquP1dO3uKg', name: '大胸筋 7種目3分半', len: '15:17', part: 'upper', sub: '胸', level: 'normal' , start: 553 },
+  { id: 'PquP1dO3uKg', name: '大胸筋 7種目3分半', len: '15:17', part: 'upper', sub: '胸', level: 'normal' , start: 553, items: [
+      { t: 570, name: 'プッシュアップ' },
+      { t: 600, name: 'インクラインプッシュアップ' },
+      { t: 630, name: 'デクラインプッシュアップ' },
+      { t: 660, name: 'フロアーバタフライ' },
+      { t: 690, name: 'ワイパーバタフライ' },
+      { t: 720, name: 'ツイストプッシュアップ' },
+      { t: 750, name: 'レスラープッシュアップ' }
+    ] },
   { id: 'RIqa_JtJ3jk', name: '胸＆腹筋 10種目5分', len: '11:05', part: 'upper', sub: '胸', level: 'easy' },
-  { id: 'al3CoAGcrTE', name: '背筋 8種目4分（器具なし）', len: '14:45', part: 'upper', sub: '背中', level: 'normal' , start: 569 },
-  { id: 'DAI9IcAxfPA', name: '肩（三角筋）7種目4分', len: '16:27', part: 'upper', sub: '肩', level: 'normal' , start: 654 },
-  { id: 'yjTD95S3TUc', name: '二の腕＆力こぶ 7種目4分半', len: '15:33', part: 'upper', sub: '腕', level: 'easy' , start: 603 , gear: ['ペットボトル'] },
+  { id: 'al3CoAGcrTE', name: '背筋 8種目4分（器具なし）', len: '14:45', part: 'upper', sub: '背中', level: 'normal' , start: 569, items: [
+      { t: 586, name: 'グッドモーニング' },
+      { t: 616, name: 'ベントオーバーアームプルダウン' },
+      { t: 646, name: 'ニースタンドバックエクステンション' },
+      { t: 676, name: 'フロアーエルボープル' },
+      { t: 706, name: 'フェイスアップエルボープル' },
+      { t: 736, name: 'ライイングバックエクステンション' },
+      { t: 766, name: 'ライイングアームサークル' },
+      { t: 796, name: 'ライイングアームプルダウン' }
+    ] },
+  { id: 'DAI9IcAxfPA', name: '肩（三角筋）7種目4分', len: '16:27', part: 'upper', sub: '肩', level: 'normal' , start: 654, items: [
+      { t: 641, name: 'サイドトゥーアップ' },
+      { t: 671, name: 'リアレイズ' },
+      { t: 701, name: 'オーバーヘッドサイドレイズ' },
+      { t: 731, name: 'ベントオーバーアームサークル' },
+      { t: 761, name: '高速サイドレイズ' },
+      { t: 791, name: 'フロアーエルボープッシュ' },
+      { t: 821, name: 'フロアーエルボープッシュ（反対側）' },
+      { t: 851, name: 'マウンテンショルダープレス' }
+    ] },
+  { id: 'yjTD95S3TUc', name: '二の腕＆力こぶ 7種目4分半', len: '15:33', part: 'upper', sub: '腕', level: 'easy' , start: 603 , gear: ['ペットボトル'], items: [
+      { t: 625, name: 'クローズスタンスプッシュアップ' },
+      { t: 655, name: 'アームカール' },
+      { t: 685, name: 'リバースプッシュアップ' },
+      { t: 715, name: 'レッグプルアームカール' },
+      { t: 745, name: 'キックバック' },
+      { t: 775, name: 'レッグプルコンセントレーションカール' },
+      { t: 805, name: 'レッグプルコンセントレーションカール（逆）' },
+      { t: 835, name: 'カール＆プレス' }
+    ] },
   { id: 'LARsdRVCvHU', name: '上半身6分（ペットボトルでも可）', len: '13:45', part: 'upper', sub: '上半身まとめて', level: 'normal' , gear: ['ペットボトル'] },
 
   // 背中と腕の補充(CALISLIFE自重トレ)。きんにくTV は背中1本・腕1本しか無く、
@@ -56,8 +91,21 @@ const DEFAULT_VIDEOS = [
   { id: 'DGdaX4PqoLg', name: '上腕三頭筋 4種目', len: '4:50', part: 'upper', sub: '腕', level: 'normal' },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
-  { id: 'BFitLouawaM', name: '脚 7種目3分半（初級）', len: '15:15', part: 'lower', sub: '太もも', level: 'easy' , start: 638  },
-  { id: 'OlGiInYmSiw', name: 'レッグランジ 4種目3分', len: '10:57', part: 'lower', sub: 'ランジ', level: 'easy' , start: 412 },
+  { id: 'BFitLouawaM', name: '脚 7種目3分半（初級）', len: '15:15', part: 'lower', sub: '太もも', level: 'easy' , start: 638, items: [
+      { t: 638, name: 'ニーアップ' },
+      { t: 668, name: 'サイドスクワット' },
+      { t: 698, name: '前傾バックランジ' },
+      { t: 728, name: 'ヒールタッチレッグカール' },
+      { t: 758, name: 'ドンキーカーフレイズ' },
+      { t: 788, name: 'エルボーインスクワット' },
+      { t: 818, name: '四股スクワット' }
+    ] },
+  { id: 'OlGiInYmSiw', name: 'レッグランジ 4種目3分', len: '10:57', part: 'lower', sub: 'ランジ', level: 'easy' , start: 412, items: [
+      { t: 442, name: 'フロントランジ' },
+      { t: 472, name: 'バックランジ' },
+      { t: 502, name: 'サイドランジ' },
+      { t: 532, name: 'ブルガリアンスクワット' }
+    ] },
   { id: 'eqZoAgF5Hkw', name: 'お尻 7種目4分半', len: '15:48', part: 'lower', sub: 'お尻', level: 'normal' },
   { id: 'tkRfK1dr15o', name: 'お尻＆内もも 10分', len: '15:52', part: 'lower', sub: 'お尻', level: 'normal' },
   { id: 'oalL5-xQeNg', name: '下半身 9種目6分（中級）', len: '14:24', part: 'lower', sub: '下半身まとめて', level: 'normal' },
@@ -78,7 +126,15 @@ const DEFAULT_VIDEOS = [
   { id: 'cQsupVhKcDg', name: 'HIIT 高強度 全身7分半', len: '11:52', part: 'full', sub: 'HIIT', level: 'hard' },
 
   // 体幹 — 筋肉量への寄与は小さいので4日に1回
-  { id: 'u-wS8jABqQI', name: '腹筋 7種類3分半', len: '12:33', part: 'core', sub: '腹筋', level: 'easy' , start: 197 },
+  { id: 'u-wS8jABqQI', name: '腹筋 7種類3分半', len: '12:33', part: 'core', sub: '腹筋', level: 'easy' , start: 197, items: [
+      { t: 204, name: 'クランチ' },
+      { t: 244, name: 'ニートゥーチェスト' },
+      { t: 274, name: 'ツイストレッグレイズ' },
+      { t: 304, name: 'バイシクルクランチ' },
+      { t: 334, name: 'プランク' },
+      { t: 364, name: 'マウンテンクライマー' },
+      { t: 436, name: 'シットアップ' }
+    ] },
   { id: 'XpoJfzAMneY', name: '腹斜筋 7種目4分', len: '13:39', part: 'core', sub: '脇腹', level: 'easy' },
   { id: '590CWWrC4PM', name: 'プランク 7種目4分', len: '13:24', part: 'core', sub: 'プランク', level: 'normal' },
   { id: 'o5vb430_m38', name: '下腹部＆くびれ 10種目10分', len: '10:50', part: 'core', sub: '下腹', level: 'normal' },
