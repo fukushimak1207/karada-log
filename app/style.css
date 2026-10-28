@@ -368,3 +368,7 @@ body.no-scroll { overflow: hidden; }
 .items .note {
   margin: 8px 0 0;
 }
+
+/* 「やりました」カードの下に出す「もう出さない」(意見 #13 の続き) */
+.done-foot { display: flex; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.done-foot .btn.small { flex: 0 0 auto; }

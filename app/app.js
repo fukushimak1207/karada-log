@@ -28,7 +28,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v12';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v13';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -680,6 +680,10 @@ function doneCardHtml(log) {
       </div>
       <p class="vtitle">${escapeHtml(name)}</p>
       ${spare ? `<p class="vmeta">${spare}</p>` : ''}
+      ${v ? `
+      <div class="done-foot">
+        <button class="btn small" data-mute-done="${escapeHtml(v.id)}">もう出さない</button>
+      </div>` : ''}
     </div>`;
 }
 
@@ -1142,6 +1146,25 @@ function swapVideo(slot, id, mute) {
   }
 }
 
+/* やり終えたあとに外す(意見 #13 の続き)。
+ * 記録(logs)は動画の ID だけを持っているので、オフにしても記録は消えない。
+ * すでにやり終えているので、別の動画への差し替えはしない。 */
+function muteVideo(id) {
+  const cur = findVideo(id);
+  if (!cur) { toast('動画が見つかりません'); return; }
+
+  const list = ensureVideosCopy();
+  const target = list.find(v => v.id === id);
+  if (target) target.on = false;
+  save();
+  render();
+
+  const left = videos().filter(v => v.on !== false && v.part === cur.part).length;
+  toast(left <= 2
+    ? `もう出しません。${PART_LABEL[cur.part]}の残りは${left}本です`
+    : 'もう出しません。記録は残ります(設定の「動画リスト」で戻せます)');
+}
+
 /* 再生位置の受け取り。
  * 埋め込みプレーヤーは enablejsapi=1 のとき、現在位置を postMessage で知らせてくる。
  * YouTube の API スクリプトは読み込まない(外部依存を増やさないため)。 */
@@ -1284,7 +1307,10 @@ function bind() {
     const swap = ev.target.closest('[data-swap]');
     if (swap) { swapVideo(Number(swap.dataset.swap), swap.dataset.id, false); return; }
     const mute = ev.target.closest('[data-mute]');
-    if (mute) { swapVideo(Number(mute.dataset.mute), mute.dataset.id, true); }
+    if (mute) { swapVideo(Number(mute.dataset.mute), mute.dataset.id, true); return; }
+    // やり終えたあとに外す。記録は残したまま、次回から出さないだけ
+    const muteDone = ev.target.closest('[data-mute-done]');
+    if (muteDone) { muteVideo(muteDone.dataset.muteDone); }
   });
 
   $('#btn-spare-yes').addEventListener('click', () => { setSpare(true); render(); });
