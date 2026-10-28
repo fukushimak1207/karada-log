@@ -28,7 +28,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v13';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v14';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -151,6 +151,10 @@ const DEFAULT_VIDEOS = [
   // ストレッチ。3本目に毎日出す。長座で腰が曲がる(股関節まわりが硬い)ため。
   { id: '-Y5bOC_ecB0', name: '股関節が超硬い人向け 毎日9分', len: '9:35', part: 'stretch', sub: '股関節', level: 'easy' },
   { id: 'cJXY4ghyRyc', name: '長座が辛い・前屈で骨盤が立たない人へ', len: '15:55', part: 'stretch', sub: '長座・前屈', level: 'easy' },
+  // 抱っこで腰・お尻が凝るという話から追加(意見 #15)
+  { id: 'anHktHYc3cA', name: '寝ながら腰痛対策ストレッチ 9分', len: '9:34', part: 'stretch', sub: '腰', level: 'easy' },
+  { id: 'KuSBg8UqGco', name: 'おしりのストレッチ 12分', len: '12:33', part: 'stretch', sub: 'お尻', level: 'easy' },
+  { id: 'ZCIoX1QLQHg', name: '腰の疲労回復ストレッチ 10分', len: '11:24', part: 'stretch', sub: '腰・骨盤', level: 'easy' },
 ];
 
 /* ---------- 日付 ---------- */
