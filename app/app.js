@@ -24,10 +24,10 @@ const PLAN_SLOTS = 2;   // ストレッチは別タブに移した(2026-10-31)�
 const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回まで
 /* 必要な道具。動画の概要欄は当てにならなかった(他の動画の宣伝文が混ざる)ので、
  * 確実なものだけ先に入れ、残りは使ったときに本人が覚えさせる。 */
-const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー'];
+const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v15';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v16';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -88,6 +88,14 @@ const DEFAULT_VIDEOS = [
   { id: 'fk1fw8ERt7E', name: '背筋100回 9種目 6分', len: '6:50', part: 'upper', sub: '背中', level: 'hard' },
   { id: 'UHn8wAbY0L0', name: 'タオルで上腕二頭筋', len: '4:46', part: 'upper', sub: '腕', level: 'easy', on: false , gear: ['タオル'] },
   { id: 'DGdaX4PqoLg', name: '上腕三頭筋 4種目', len: '4:50', part: 'upper', sub: '腕', level: 'normal' },
+
+  // チューブの「引く」種目(2026-11-01)。自重では背中に負荷を作れないので、
+  // ここだけは道具に頼る。ドアアンカーで引く方向を作る。
+  { id: '8ysfRSE_j6g', name: 'チューブで背筋（使い方から）', len: '4:28', part: 'upper', sub: '背中', level: 'easy' , gear: ['チューブ'] },
+  { id: '-9VBPdxQyTM', name: 'チューブで広い背中 4分', len: '4:32', part: 'upper', sub: '背中', level: 'easy' , gear: ['チューブ'] },
+  { id: 'KV14VKiSwUs', name: 'チューブで背筋 10種目', len: '5:28', part: 'upper', sub: '背中', level: 'normal' , gear: ['チューブ'] },
+  { id: 'MO80I4048yI', name: 'チューブで背中全体 5種目', len: '6:07', part: 'upper', sub: '背中', level: 'hard' , gear: ['チューブ'] },
+  { id: 'gSg5scZMwGo', name: 'チューブで上半身 6種目（背中・腕・肩）', len: '7:12', part: 'upper', sub: '上半身まとめて', level: 'normal' , gear: ['チューブ'] },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
   { id: 'BFitLouawaM', name: '脚 7種目3分半（初級）', len: '15:15', part: 'lower', sub: '太もも', level: 'easy' , start: 638, items: [
@@ -158,6 +166,7 @@ const DEFAULT_VIDEOS = [
   { id: 'ZYTlwh_FhoU', name: '肩甲骨が超硬い人向け 12分', len: '12:49', part: 'stretch', sub: '肩甲骨', level: 'easy' },
   { id: '0HSnE1BRO-A', name: '腰痛持ちの方へおすすめ 10分', len: '11:37', part: 'stretch', sub: '腰', level: 'easy' },
   { id: '4zC3TO8DQms', name: 'ガチガチの肩こりを解消 6分', len: '6:58', part: 'stretch', sub: '肩こり', level: 'easy' },
+  { id: 'KySYkJUpC0k', name: 'チューブで肩甲骨まわり 10分', len: '9:45', part: 'stretch', sub: '肩甲骨', level: 'easy' , gear: ['チューブ'] },
 ];
 
 /* ---------- 日付 ---------- */
@@ -770,6 +779,9 @@ function renderStretch() {
           <span class="vmeta">${escapeHtml(v.len)}</span>
         </div>
         <p class="vtitle">${escapeHtml(v.name)}</p>
+        ${gearOf(v.id).length
+          ? `<p class="gear-line">要るもの：<strong>${escapeHtml(gearOf(v.id).join('・'))}</strong></p>`
+          : ''}
         <div class="player" data-player="${escapeHtml(v.id)}">
           <button class="btn primary wide play" data-play="${escapeHtml(v.id)}">ここで再生</button>
         </div>
