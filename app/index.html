@@ -28,6 +28,12 @@
 </header>
 
 <main>
+  <nav class="tabs">
+    <button class="tab on" data-tab="today">今日やること</button>
+    <button class="tab" data-tab="stretch">ストレッチ</button>
+  </nav>
+
+  <div id="tab-today">
   <!-- 測る日などの知らせ(開いたときだけ出る。Webアプリは定時に通知を鳴らせない) -->
   <div id="notices" hidden></div>
 
@@ -83,6 +89,12 @@
     <h2 class="sec-title">記録</h2>
     <ul class="history" id="history"></ul>
   </section>
+  </div>
+
+  <!-- ストレッチ(記録はしない。やりたいものを選んで再生するだけ) -->
+  <div id="tab-stretch" hidden>
+    <div id="stretch-list"></div>
+  </div>
 </main>
 
 <!-- 設定画面 -->

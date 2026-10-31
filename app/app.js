@@ -20,15 +20,14 @@ const LEVEL_LABEL = { easy: 'やさしい', normal: 'ふつう', hard: 'きつ�
 const SPARE_TO_LEVEL_UP = 2;   // 「できそう」がこの回数続いたらレベルを上げる
 /* 1日にやる本数。1本目=部位のローテ、2本目=体幹(体幹の日は上半身の手薄なところ)。
  * 腹筋を増やしたいという本人の希望で、2026-10-21 に1本立てから変えた。 */
-const PLAN_SLOTS = 3;   // 3本目はストレッチ(2026-10-24 追加。長座で腰が曲がるため)
-const STRETCH_SLOT = 3;
+const PLAN_SLOTS = 2;   // ストレッチは別タブに移した(2026-10-31)。記録もしない
 const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回まで
 /* 必要な道具。動画の概要欄は当てにならなかった(他の動画の宣伝文が混ざる)ので、
  * 確実なものだけ先に入れ、残りは使ったときに本人が覚えさせる。 */
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v14';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v15';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -155,6 +154,10 @@ const DEFAULT_VIDEOS = [
   { id: 'anHktHYc3cA', name: '寝ながら腰痛対策ストレッチ 9分', len: '9:34', part: 'stretch', sub: '腰', level: 'easy' },
   { id: 'KuSBg8UqGco', name: 'おしりのストレッチ 12分', len: '12:33', part: 'stretch', sub: 'お尻', level: 'easy' },
   { id: 'ZCIoX1QLQHg', name: '腰の疲労回復ストレッチ 10分', len: '11:24', part: 'stretch', sub: '腰・骨盤', level: 'easy' },
+  // 本人のプレイリスト「ストレッチ」から(2026-10-31)
+  { id: 'ZYTlwh_FhoU', name: '肩甲骨が超硬い人向け 12分', len: '12:49', part: 'stretch', sub: '肩甲骨', level: 'easy' },
+  { id: '0HSnE1BRO-A', name: '腰痛持ちの方へおすすめ 10分', len: '11:37', part: 'stretch', sub: '腰', level: 'easy' },
+  { id: '4zC3TO8DQms', name: 'ガチガチの肩こりを解消 6分', len: '6:58', part: 'stretch', sub: '肩こり', level: 'easy' },
 ];
 
 /* ---------- 日付 ---------- */
@@ -380,6 +383,7 @@ function todaysPlan() {
 /* 今日の slot 番目にやる分を決める。
  *  slot 1 … 部位のローテ(下半身→上半身→全身→体幹)
  *  slot 2 … 体幹。1本目が体幹の日は、上半身の手薄なところ(背中・腕)
+ * ストレッチはここでは出さない(別タブ)。
  * PLAN_SLOTS を超えた分は nextPlan()(余力があるときの追加)が決める。 */
 function planFor(slot) {
   if (slot <= 1) return todaysPlan();
@@ -390,12 +394,6 @@ function planFor(slot) {
   }
   const d = todayStr();
   const done = logsOf(d).map(l => l.id);
-
-  // 3本目はストレッチで固定
-  if (slot === STRETCH_SLOT) {
-    const sv = pickVideo('stretch', 'easy', done);
-    return sv ? { video: sv, part: 'stretch', level: sv.level } : null;
-  }
 
   const mainPart = (logsOf(d).find(l => l.slot === 1) || {}).part || nextPart();
   const part = mainPart === 'core' ? 'upper' : 'core';
@@ -752,6 +750,43 @@ function render() {
   renderBalance();
   renderHistory();
   renderBackupNote();
+  if (!$('#tab-stretch').hidden) renderStretch();
+}
+
+/* ストレッチのタブ。記録はしない(連続日数やのべ本数には入れない)。
+ * 日によってほぐしたいところが違うので、自動で1本出さずに一覧から選ぶ。 */
+function renderStretch() {
+  const el = $('#stretch-list');
+  if (!el) return;
+  const list = videos()
+    .filter(v => v.part === 'stretch' && v.on !== false)
+    .sort((a, b) => String(a.sub).localeCompare(String(b.sub), 'ja'));
+
+  el.innerHTML = list.length
+    ? list.map(v => `
+      <div class="card stretch-card">
+        <div class="part-row">
+          ${v.sub ? `<span class="sub-badge">${escapeHtml(v.sub)}</span>` : ''}
+          <span class="vmeta">${escapeHtml(v.len)}</span>
+        </div>
+        <p class="vtitle">${escapeHtml(v.name)}</p>
+        <div class="player" data-player="${escapeHtml(v.id)}">
+          <button class="btn primary wide play" data-play="${escapeHtml(v.id)}">ここで再生</button>
+        </div>
+        <div class="btn-row sub-row">
+          <a class="btn small" href="${ytUrl(v.id)}" target="_blank" rel="noopener">YouTubeで開く</a>
+        </div>
+      </div>`).join('')
+    : '<div class="card"><p class="note">設定の「動画リスト」でストレッチをオンにしてください。</p></div>';
+}
+
+function showTab(name) {
+  $('#tab-today').hidden = name !== 'today';
+  $('#tab-stretch').hidden = name !== 'stretch';
+  document.querySelectorAll('.tab').forEach(b => {
+    b.classList.toggle('on', b.dataset.tab === name);
+  });
+  if (name === 'stretch') renderStretch();
 }
 
 function renderNotices() {
@@ -1304,6 +1339,12 @@ function bind() {
     render();
     const g = gearOf(chip.dataset.gear);
     toast(g.length ? `要るもの：${g.join('・')}` : '道具なしにしました');
+  });
+
+  // タブの切り替え
+  document.addEventListener('click', ev => {
+    const t = ev.target.closest('.tab');
+    if (t) showTab(t.dataset.tab);
   });
 
   // 合わない動画をその場で外す(意見 #7)

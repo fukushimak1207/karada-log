@@ -372,3 +372,10 @@ body.no-scroll { overflow: hidden; }
 /* 「やりました」カードの下に出す「もう出さない」(意見 #13 の続き) */
 .done-foot { display: flex; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
 .done-foot .btn.small { flex: 0 0 auto; }
+
+/* タブ(今日やること / ストレッチ) */
+.tabs { display: flex; gap: 8px; margin: 0 0 12px; }
+.tab { flex: 1; padding: 10px 8px; font-size: .95rem; font-weight: 700; color: var(--ink-sub);
+       background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.tab.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.stretch-card + .stretch-card { margin-top: 12px; }
