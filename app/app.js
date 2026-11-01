@@ -27,7 +27,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v20';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v21';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -167,6 +167,8 @@ const DEFAULT_VIDEOS = [
   { id: '0HSnE1BRO-A', name: '腰痛持ちの方へおすすめ 10分', len: '11:37', part: 'stretch', sub: '腰痛', level: 'easy' },
   { id: '4zC3TO8DQms', name: 'ガチガチの肩こりを解消 6分', len: '6:58', part: 'stretch', sub: '肩こり', level: 'easy' },
   { id: 'KySYkJUpC0k', name: 'チューブで肩甲骨まわり 10分', len: '9:45', part: 'stretch', sub: 'チューブ', level: 'easy' , gear: ['チューブ'] },
+  // 開脚前屈ができないという話から(2026-11-02)。まずは長座で骨盤を立てるほうが先
+  { id: 'Re5FPU5_37g', name: '開脚できるようになるストレッチ 14分', len: '14:10', part: 'stretch', sub: '開脚', level: 'easy' },
 ];
 
 /* ---------- 日付 ---------- */
