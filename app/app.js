@@ -27,7 +27,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v16';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v17';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -763,12 +763,13 @@ function render() {
 }
 
 /* ストレッチのタブ。記録はしない(連続日数やのべ本数には入れない)。
- * 日によってほぐしたいところが違うので、自動で1本出さずに一覧から選ぶ。 */
+ * 日によってほぐしたいところが違うので、自動で1本出さずに一覧から選ぶ。
+ * オン・オフでは絞らない。自分で選ぶものなので、いつでも全部出す。 */
 function renderStretch() {
   const el = $('#stretch-list');
   if (!el) return;
   const list = videos()
-    .filter(v => v.part === 'stretch' && v.on !== false)
+    .filter(v => v.part === 'stretch')
     .sort((a, b) => String(a.sub).localeCompare(String(b.sub), 'ja'));
 
   el.innerHTML = list.length
@@ -789,7 +790,7 @@ function renderStretch() {
           <a class="btn small" href="${ytUrl(v.id)}" target="_blank" rel="noopener">YouTubeで開く</a>
         </div>
       </div>`).join('')
-    : '<div class="card"><p class="note">設定の「動画リスト」でストレッチをオンにしてください。</p></div>';
+    : '<div class="card"><p class="note">ストレッチの動画がありません。</p></div>';
 }
 
 function showTab(name) {
