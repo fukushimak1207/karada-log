@@ -155,7 +155,9 @@ main { padding: 0 16px; max-width: 560px; margin: 0 auto; }
 .balance { display: grid; gap: 8px; }
 .bal-row { display: grid; grid-template-columns: 5.5em 1fr 2.5em; align-items: center; gap: 8px; font-size: .9rem; }
 .bal-bar { background: var(--line); border-radius: 999px; height: 12px; overflow: hidden; }
-.bal-fill { background: var(--accent); height: 100%; border-radius: 999px; }
+/* span は既定で inline なので、display を指定しないと width/height が効かない
+ * (.bal-bar はグリッドの子なので勝手に block になるが、その中の .bal-fill は効かなかった) */
+.bal-fill { display: block; background: var(--accent); height: 100%; border-radius: 999px; }
 .bal-num { text-align: right; color: var(--ink-sub); font-size: .85rem; }
 
 /* 履歴 */
