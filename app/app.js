@@ -27,7 +27,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v18';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v19';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -247,6 +247,7 @@ function load() {
     if (typeof state.measure.last !== 'string') state.measure.last = null;
     if (!state.starts || typeof state.starts !== 'object') state.starts = {};
     if (!state.gear || typeof state.gear !== 'object') state.gear = {};
+    mergeNewVideos();
   } catch (e) {
     console.warn('保存データを読めなかったので初期状態で始めます', e);
     state = defaultState();
@@ -264,6 +265,19 @@ function save() {
 
 function videos() {
   return (state.videos && state.videos.length) ? state.videos : DEFAULT_VIDEOS.map(v => ({ ...v, on: v.on !== false }));
+}
+
+/* 動画リストを一度でも触ると、その時点の一覧が端末に保存される(state.videos)。
+ * 以後はそちらが使われるので、あとから足した動画がその端末にだけ出てこない。
+ * 保存ずみの一覧に無い動画を、読み込みのたびに後ろへ足して追いつかせる。
+ * 既にある動画は触らない(オン・オフや部位の直しを上書きしないため)。 */
+function mergeNewVideos() {
+  if (!Array.isArray(state.videos) || !state.videos.length) return;
+  const have = new Set(state.videos.map(v => v && v.id));
+  const added = DEFAULT_VIDEOS.filter(v => !have.has(v.id));
+  if (!added.length) return;
+  state.videos = state.videos.concat(added.map(v => ({ ...v, on: v.on !== false })));
+  save();
 }
 
 /* ---------- 今日やることを決める ---------- */
