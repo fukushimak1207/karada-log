@@ -27,7 +27,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v19';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v20';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -164,9 +164,9 @@ const DEFAULT_VIDEOS = [
   { id: 'ZCIoX1QLQHg', name: '腰の疲労回復ストレッチ 10分', len: '11:24', part: 'stretch', sub: '腰・骨盤', level: 'easy' },
   // 本人のプレイリスト「ストレッチ」から(2026-10-31)
   { id: 'ZYTlwh_FhoU', name: '肩甲骨が超硬い人向け 12分', len: '12:49', part: 'stretch', sub: '肩甲骨', level: 'easy' },
-  { id: '0HSnE1BRO-A', name: '腰痛持ちの方へおすすめ 10分', len: '11:37', part: 'stretch', sub: '腰', level: 'easy' },
+  { id: '0HSnE1BRO-A', name: '腰痛持ちの方へおすすめ 10分', len: '11:37', part: 'stretch', sub: '腰痛', level: 'easy' },
   { id: '4zC3TO8DQms', name: 'ガチガチの肩こりを解消 6分', len: '6:58', part: 'stretch', sub: '肩こり', level: 'easy' },
-  { id: 'KySYkJUpC0k', name: 'チューブで肩甲骨まわり 10分', len: '9:45', part: 'stretch', sub: '肩甲骨', level: 'easy' , gear: ['チューブ'] },
+  { id: 'KySYkJUpC0k', name: 'チューブで肩甲骨まわり 10分', len: '9:45', part: 'stretch', sub: 'チューブ', level: 'easy' , gear: ['チューブ'] },
 ];
 
 /* ---------- 日付 ---------- */
@@ -779,6 +779,9 @@ function render() {
 /* ストレッチのタブ。記録はしない(連続日数やのべ本数には入れない)。
  * 日によってほぐしたいところが違うので、自動で1本出さずに一覧から選ぶ。
  * オン・オフでは絞らない。自分で選ぶものなので、いつでも全部出す。 */
+/* いま選んでいるストレッチ。端末には保存しない(開き直せば一覧に戻る) */
+let stretchPick = null;
+
 function renderStretch() {
   const el = $('#stretch-list');
   if (!el) return;
@@ -786,25 +789,41 @@ function renderStretch() {
     .filter(v => v.part === 'stretch')
     .sort((a, b) => String(a.sub).localeCompare(String(b.sub), 'ja'));
 
-  el.innerHTML = list.length
-    ? list.map(v => `
-      <div class="card stretch-card">
-        <div class="part-row">
-          ${v.sub ? `<span class="sub-badge">${escapeHtml(v.sub)}</span>` : ''}
-          <span class="vmeta">${escapeHtml(v.len)}</span>
-        </div>
-        <p class="vtitle">${escapeHtml(v.name)}</p>
-        ${gearOf(v.id).length
-          ? `<p class="gear-line">要るもの：<strong>${escapeHtml(gearOf(v.id).join('・'))}</strong></p>`
-          : ''}
-        <div class="player" data-player="${escapeHtml(v.id)}">
-          <button class="btn primary wide play" data-play="${escapeHtml(v.id)}">ここで再生</button>
-        </div>
-        <div class="btn-row sub-row">
-          <a class="btn small" href="${ytUrl(v.id)}" target="_blank" rel="noopener">YouTubeで開く</a>
-        </div>
-      </div>`).join('')
-    : '<div class="card"><p class="note">ストレッチの動画がありません。</p></div>';
+  if (!list.length) {
+    el.innerHTML = '<div class="card"><p class="note">ストレッチの動画がありません。</p></div>';
+    return;
+  }
+  if (stretchPick && !list.some(v => v.id === stretchPick)) stretchPick = null;
+
+  // 選んだ1本だけをカードにして上に出す。全部を縦に並べると選びにくいため
+  const v = stretchPick ? list.find(x => x.id === stretchPick) : null;
+  const card = v ? `
+    <div class="card stretch-card">
+      <div class="part-row">
+        ${v.sub ? `<span class="sub-badge">${escapeHtml(v.sub)}</span>` : ''}
+        <span class="vmeta">${escapeHtml(v.len)}</span>
+      </div>
+      <p class="vtitle">${escapeHtml(v.name)}</p>
+      ${gearOf(v.id).length
+        ? `<p class="gear-line">要るもの：<strong>${escapeHtml(gearOf(v.id).join('・'))}</strong></p>`
+        : ''}
+      <div class="player" data-player="${escapeHtml(v.id)}">
+        <button class="btn primary wide play" data-play="${escapeHtml(v.id)}">ここで再生</button>
+      </div>
+      <div class="btn-row sub-row">
+        <a class="btn small" href="${ytUrl(v.id)}" target="_blank" rel="noopener">YouTubeで開く</a>
+        <button class="btn small" data-stretch-close="1">閉じる</button>
+      </div>
+    </div>` : '';
+
+  // 一覧は部位だけのタイルにして、横に並べる
+  const tiles = list.map(x => `
+    <button type="button" class="stretch-tile${x.id === stretchPick ? ' on' : ''}" data-stretch="${escapeHtml(x.id)}">
+      <span class="tile-sub">${escapeHtml(x.sub || 'ストレッチ')}</span>
+      <span class="tile-len">${escapeHtml(x.len)}</span>
+    </button>`).join('');
+
+  el.innerHTML = card + `<div class="stretch-grid">${tiles}</div>`;
 }
 
 function showTab(name) {
@@ -1372,6 +1391,21 @@ function bind() {
   document.addEventListener('click', ev => {
     const t = ev.target.closest('.tab');
     if (t) showTab(t.dataset.tab);
+  });
+
+  // ストレッチは部位のタイルから選ぶ。選んだ1本だけが上にカードで出る
+  document.addEventListener('click', ev => {
+    const tile = ev.target.closest('[data-stretch]');
+    if (tile) {
+      stretchPick = tile.dataset.stretch === stretchPick ? null : tile.dataset.stretch;
+      renderStretch();
+      if (stretchPick) $('#stretch-list').scrollIntoView({ block: 'start' });
+      return;
+    }
+    if (ev.target.closest('[data-stretch-close]')) {
+      stretchPick = null;
+      renderStretch();
+    }
   });
 
   // 合わない動画をその場で外す(意見 #7)

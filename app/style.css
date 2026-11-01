@@ -380,4 +380,14 @@ body.no-scroll { overflow: hidden; }
 .tab { flex: 1; padding: 10px 8px; font-size: .95rem; font-weight: 700; color: var(--ink-sub);
        background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
 .tab.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
-.stretch-card + .stretch-card { margin-top: 12px; }
+.stretch-card { margin-bottom: 12px; }
+
+/* 部位のタイル。縦に全部並べると選びにくいので、横に詰めて並べる */
+.stretch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.stretch-tile { display: flex; flex-direction: column; align-items: center; gap: 2px;
+                padding: 12px 6px; background: var(--card); color: var(--ink);
+                border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.stretch-tile.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.tile-sub { font-size: .95rem; font-weight: 700; }
+.tile-len { font-size: .8rem; color: var(--ink-sub); }
+.stretch-tile.on .tile-len { color: inherit; opacity: .8; }
