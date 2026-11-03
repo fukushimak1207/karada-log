@@ -27,7 +27,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v21';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v22';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -385,6 +385,21 @@ function setPicked(slot, id) {
   }
   state.todayPick.ids[String(slot)] = id;
   save();
+}
+
+/* リンクで今日の1本目を決める。?v=<動画ID> を付けて開くと、その動画が今日の分になる。
+ * スマホを触っている最中に「今日はこれ」と決めたいとき用。記録ずみなら何もしない。 */
+function applyLinkPick() {
+  let id = '';
+  try { id = new URLSearchParams(location.search).get('v') || ''; } catch (e) { return; }
+  if (!id) return;
+  // URL に残すと、次に開いたときも同じ動画になってしまうので消す
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  const v = findVideo(id);
+  if (!v) { toast('その動画は見つかりません'); return; }
+  if (logsOf(todayStr()).some(l => l.slot === 1)) { toast('今日はもう記録済みです'); return; }
+  setPicked(1, id);
+  toast('今日の動画にしました');
 }
 
 function todaysPlan() {
@@ -1539,6 +1554,7 @@ function bind() {
 
 load();
 fbLoad();
+applyLinkPick();
 bind();
 watchFullscreen();
 render();
