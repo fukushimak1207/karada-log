@@ -13,8 +13,12 @@ const STORE_KEY = 'karadalog.v1';
 /* 部位のまわし方: 下半身 → 上半身 → 全身 → 体幹 の4日サイクル。
  * 目標が「筋肉を増やす」なので、体で一番大きい下半身から始め、全身の日を挟んで
  * 下半身と上半身に当たる回数を増やす。厚労省ガイドも大きな筋群をまんべんなく鍛えることを勧めている。 */
-const PARTS = ['lower', 'upper', 'full', 'core'];
-const PART_LABEL = { upper: '上半身', lower: '下半身', core: '体幹', full: '全身', warmup: 'ウォームアップ', stretch: 'ストレッチ' };
+/* 1本目のローテ。2026-11-05 に「全身」を外して「背中」を入れた。
+ * 全身は1本で部位を広く扱うぶん1部位あたりが薄く、前後の日と中身がかぶっていた。
+ * 背中は自重では負荷を作れず手薄だったので、チューブが入ったこの枠に独立させる。
+ * 全身の動画は残してあり、設定の「今日の動画を変える」から選べる。 */
+const PARTS = ['lower', 'upper', 'back', 'core'];
+const PART_LABEL = { upper: '上半身', lower: '下半身', core: '体幹', back: '背中', full: '全身', warmup: 'ウォームアップ', stretch: 'ストレッチ' };
 const LEVELS = ['easy', 'normal', 'hard'];
 const LEVEL_LABEL = { easy: 'やさしい', normal: 'ふつう', hard: 'きつい' };
 const SPARE_TO_LEVEL_UP = 2;   // 「できそう」がこの回数続いたらレベルを上げる
@@ -27,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v22';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v23';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -49,7 +53,7 @@ const DEFAULT_VIDEOS = [
       { t: 750, name: 'レスラープッシュアップ' }
     ] },
   { id: 'RIqa_JtJ3jk', name: '胸＆腹筋 10種目5分', len: '11:05', part: 'upper', sub: '胸', level: 'easy' },
-  { id: 'al3CoAGcrTE', name: '背筋 8種目4分（器具なし）', len: '14:45', part: 'upper', sub: '背中', level: 'normal' , start: 569, items: [
+  { id: 'al3CoAGcrTE', name: '背筋 8種目4分（器具なし）', len: '14:45', part: 'back', sub: '背中', level: 'normal' , start: 569, items: [
       { t: 586, name: 'グッドモーニング' },
       { t: 616, name: 'ベントオーバーアームプルダウン' },
       { t: 646, name: 'ニースタンドバックエクステンション' },
@@ -83,18 +87,18 @@ const DEFAULT_VIDEOS = [
 
   // 背中と腕の補充(CALISLIFE自重トレ)。きんにくTV は背中1本・腕1本しか無く、
   // 器具なしで「引く」種目が作れないため。タオルは家にあるので追加購入は不要。
-  { id: 'IgwjbjOAxQk', name: 'タオルで背中全体 6分', len: '6:04', part: 'upper', sub: '背中', level: 'easy', on: false , gear: ['タオル'] },
-  { id: 'Q-LGg-58_ZU', name: '背筋7種目 器具なし 6分', len: '6:18', part: 'upper', sub: '背中', level: 'normal' },
-  { id: 'fk1fw8ERt7E', name: '背筋100回 9種目 6分', len: '6:50', part: 'upper', sub: '背中', level: 'hard' },
+  { id: 'IgwjbjOAxQk', name: 'タオルで背中全体 6分', len: '6:04', part: 'back', sub: '背中', level: 'easy', on: false , gear: ['タオル'] },
+  { id: 'Q-LGg-58_ZU', name: '背筋7種目 器具なし 6分', len: '6:18', part: 'back', sub: '背中', level: 'normal' },
+  { id: 'fk1fw8ERt7E', name: '背筋100回 9種目 6分', len: '6:50', part: 'back', sub: '背中', level: 'hard' },
   { id: 'UHn8wAbY0L0', name: 'タオルで上腕二頭筋', len: '4:46', part: 'upper', sub: '腕', level: 'easy', on: false , gear: ['タオル'] },
   { id: 'DGdaX4PqoLg', name: '上腕三頭筋 4種目', len: '4:50', part: 'upper', sub: '腕', level: 'normal' },
 
   // チューブの「引く」種目(2026-11-01)。自重では背中に負荷を作れないので、
   // ここだけは道具に頼る。ドアアンカーで引く方向を作る。
-  { id: '8ysfRSE_j6g', name: 'チューブで背筋（使い方から）', len: '4:28', part: 'upper', sub: '背中', level: 'easy' , gear: ['チューブ'] },
-  { id: '-9VBPdxQyTM', name: 'チューブで広い背中 4分', len: '4:32', part: 'upper', sub: '背中', level: 'easy' , gear: ['チューブ'] },
-  { id: 'KV14VKiSwUs', name: 'チューブで背筋 10種目', len: '5:28', part: 'upper', sub: '背中', level: 'normal' , gear: ['チューブ'] },
-  { id: 'MO80I4048yI', name: 'チューブで背中全体 5種目', len: '6:07', part: 'upper', sub: '背中', level: 'hard' , gear: ['チューブ'] },
+  { id: '8ysfRSE_j6g', name: 'チューブで背筋（使い方から）', len: '4:28', part: 'back', sub: '背中', level: 'easy' , gear: ['チューブ'] },
+  { id: '-9VBPdxQyTM', name: 'チューブで広い背中 4分', len: '4:32', part: 'back', sub: '背中', level: 'easy' , gear: ['チューブ'] },
+  { id: 'KV14VKiSwUs', name: 'チューブで背筋 10種目', len: '5:28', part: 'back', sub: '背中', level: 'normal' , gear: ['チューブ'] },
+  { id: 'MO80I4048yI', name: 'チューブで背中全体 5種目', len: '6:07', part: 'back', sub: '背中', level: 'hard' , gear: ['チューブ'] },
   { id: 'gSg5scZMwGo', name: 'チューブで上半身 6種目（背中・腕・肩）', len: '7:12', part: 'upper', sub: '上半身まとめて', level: 'normal' , gear: ['チューブ'] },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
@@ -216,8 +220,8 @@ function fmtDate(str) {
 const defaultState = () => ({
   v: 1,
   logs: [],                                           // {d, id, part, level, spare, slot}
-  levels: { lower: 'easy', upper: 'easy', full: 'easy', core: 'easy' },
-  spareRun: { lower: 0, upper: 0, full: 0, core: 0 },
+  levels: { lower: 'easy', upper: 'easy', back: 'easy', full: 'easy', core: 'easy' },
+  spareRun: { lower: 0, upper: 0, back: 0, full: 0, core: 0 },
   videos: null,                                       // 編集したときだけ配列が入る
   todayPick: null,                                    // {d, ids:{slot:id}} 手で選んだ今日の動画
   lastExport: null,
@@ -226,6 +230,7 @@ const defaultState = () => ({
   starts: {},                                         // {動画ID: 秒} 運動が始まる位置。覚えさせた分
   gear: {},                                           // {動画ID: [道具]} 覚えさせた分
   goal: '',                                           // 目標の数値。端末内にだけ置く(公開コードに入れない)
+  backMoved: false,                                   // 背中を上半身から付け替えたか(一度だけ)
 });
 
 let state = defaultState();
@@ -250,6 +255,7 @@ function load() {
     if (!state.starts || typeof state.starts !== 'object') state.starts = {};
     if (!state.gear || typeof state.gear !== 'object') state.gear = {};
     mergeNewVideos();
+    moveBackVideos();
   } catch (e) {
     console.warn('保存データを読めなかったので初期状態で始めます', e);
     state = defaultState();
@@ -402,6 +408,21 @@ function applyLinkPick() {
   toast('今日の動画にしました');
 }
 
+/* 背中を上半身から独立させた(2026-11-05)。保存ずみの一覧を持つ端末では
+ * 部位が「上半身」のままなので、背中の日に出す動画が無くなってしまう。
+ * 一度だけ付け替える。本人が後から部位を直したら、それはそのまま残る。 */
+const BACK_IDS = ['al3CoAGcrTE', 'IgwjbjOAxQk', 'Q-LGg-58_ZU', 'fk1fw8ERt7E',
+                  '8ysfRSE_j6g', '-9VBPdxQyTM', 'KV14VKiSwUs', 'MO80I4048yI'];
+
+function moveBackVideos() {
+  if (state.backMoved) return;
+  state.backMoved = true;
+  if (Array.isArray(state.videos) && state.videos.length) {
+    state.videos.forEach(v => { if (v && BACK_IDS.includes(v.id) && v.part === 'upper') v.part = 'back'; });
+  }
+  save();
+}
+
 function todaysPlan() {
   const d = todayStr();
   const picked = pickedId(1);
@@ -537,7 +558,7 @@ function thisWeekDays() {
 
 function balance30() {
   const from = addDays(todayStr(), -29);
-  const counts = { upper: 0, lower: 0, core: 0, full: 0 };
+  const counts = { upper: 0, lower: 0, core: 0, back: 0 };
   state.logs.filter(l => l.d >= from).forEach(l => {
     if (counts[l.part] === undefined) counts[l.part] = 0;
     counts[l.part]++;
