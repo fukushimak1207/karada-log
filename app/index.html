@@ -29,7 +29,8 @@
 
 <main>
   <nav class="tabs">
-    <button class="tab on" data-tab="today">今日やること</button>
+    <button class="tab on" data-tab="today">動画</button>
+    <button class="tab" data-tab="menu">メニュー</button>
     <button class="tab" data-tab="stretch">ストレッチ</button>
   </nav>
 
@@ -89,6 +90,11 @@
     <h2 class="sec-title">記録</h2>
     <ul class="history" id="history"></ul>
   </section>
+  </div>
+
+  <!-- 処方型メニュー(種目・回数・負荷を自分に合わせて出す) -->
+  <div id="tab-menu" hidden>
+    <div id="menu-area"></div>
   </div>
 
   <!-- ストレッチ(記録はしない。やりたいものを選んで再生するだけ) -->

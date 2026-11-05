@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v24';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v26';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -236,6 +236,9 @@ const defaultState = () => ({
   gear: {},                                           // {動画ID: [道具]} 覚えさせた分
   goal: '',                                           // 目標の数値。端末内にだけ置く(公開コードに入れない)
   backMoved: false,                                   // 背中を上半身から付け替えたか(一度だけ)
+  rx: {},                                             // {種目キー: {load, reps, last, updated}} 処方
+  measured: null,                                     // 実力を測った日。測っていなければ null
+  rxMin: 15,                                          // メニューで最後に選んだ持ち時間(分)
 });
 
 let state = defaultState();
@@ -871,11 +874,13 @@ function renderStretch() {
 
 function showTab(name) {
   $('#tab-today').hidden = name !== 'today';
+  $('#tab-menu').hidden = name !== 'menu';
   $('#tab-stretch').hidden = name !== 'stretch';
   document.querySelectorAll('.tab').forEach(b => {
     b.classList.toggle('on', b.dataset.tab === name);
   });
   if (name === 'stretch') renderStretch();
+  if (name === 'menu') renderMenu();
 }
 
 function renderNotices() {
@@ -1576,12 +1581,442 @@ function bind() {
   });
 }
 
+
+/* ---------- 処方型メニュー ---------- */
+
+/* チューブ5本の強さ。ゴム本体の印字どおり(ポンド)。
+ * ハンドルに複数本を掛けると足し算になる。10/15/20/25/40 の組み合わせで
+ * 10〜100ポンドが5ポンドきざみ、最後に110ポンド。全部で20段。 */
+const BANDS = [
+  { color: '黄', lb: 10 }, { color: '青', lb: 15 }, { color: '赤', lb: 20 },
+  { color: '緑', lb: 25 }, { color: '黒', lb: 40 },
+];
+
+/* 同じ強さを作れる組が複数あるときは、本数の少ないほうを使う(付け替えが楽なため) */
+function buildBandSteps() {
+  const best = new Map();
+  for (let bits = 1; bits < (1 << BANDS.length); bits++) {
+    const colors = [];
+    let lb = 0;
+    BANDS.forEach((b, i) => { if (bits & (1 << i)) { colors.push(b.color); lb += b.lb; } });
+    const cur = best.get(lb);
+    if (!cur || cur.colors.length > colors.length) best.set(lb, { lb, colors });
+  }
+  return [...best.values()].sort((a, b) => a.lb - b.lb);
+}
+const BAND_STEPS = buildBandSteps();
+
+const REP_MIN = 8;      // この回数に届かなければ負荷を下げる
+const REP_MAX = 15;     // この回数に届いたら負荷を上げて回数を戻す
+const SETS = 3;
+const MIN_PER_EX = 5;   // 1種目にかかる目安(分)。3セット+休憩+準備
+const TIME_CHOICES = [5, 10, 15, 20];
+
+/* 秒で数える種目(プランクなど)の目標。回数と同じしくみで伸ばす */
+const SEC_MIN = 20, SEC_MAX = 60, SEC_STEP = 5;
+
+/* 種目。levels は自重の難易度(弱い順)。step はチューブの負荷段(BAND_STEPS の番号)。
+ * how はやり方。動画の代わりに、読んで分かる長さにする。 */
+const EXERCISES = [
+  // 下半身
+  { key: 'squat', name: 'スクワット', part: 'lower', type: 'bw',
+    levels: ['椅子に座って立つ', 'スクワット', '片脚を椅子に乗せて'],
+    how: '足は肩幅。お尻を後ろへ引きながら下ろす。ひざがつま先より前に出すぎないように。' },
+  { key: 'hip', name: 'ヒップリフト', part: 'lower', type: 'bw',
+    levels: ['両脚', '片脚', '片脚＋上で3秒止める'],
+    how: '仰向けでひざを立て、お尻を持ち上げる。上で尻に力を入れてから下ろす。' },
+  { key: 'calf', name: 'カーフレイズ', part: 'lower', type: 'bw',
+    levels: ['両脚', '片脚', '片脚＋段差に乗って'],
+    how: 'かかとを上げてつま先立ち。上で止めて、ゆっくり下ろす。' },
+  { key: 'tdead', name: 'チューブ デッドリフト', part: 'lower', type: 'tube', step: 5,
+    how: 'チューブを両足で踏み、ハンドルを持つ。背中を丸めずお尻を引いて下ろし、立ち上がる。' },
+
+  // 上半身（押す）
+  { key: 'push', name: '腕立て', part: 'upper', type: 'bw',
+    levels: ['壁に手をついて', 'ひざをついて', '腕立て', '足を台に乗せて'],
+    how: '手は肩幅より少し外。体を一直線に保ったまま下ろす。肘は45度くらいに引く。' },
+  { key: 'pike', name: 'パイクプッシュアップ', part: 'upper', type: 'bw',
+    levels: ['ひざをついて', '腰を高く上げて', '足を台に乗せて'],
+    how: 'お尻を高く上げた山の形から、頭を床へ下ろす。肩に効かせる種目。' },
+  { key: 'tpress', name: 'チューブ チェストプレス', part: 'upper', type: 'tube', step: 4,
+    how: 'ドアアンカーを背中側、胸の高さに。両手を前へ押し出す。胸を張ったまま。' },
+  { key: 'tshoulder', name: 'チューブ ショルダープレス', part: 'upper', type: 'tube', step: 2,
+    how: 'チューブを足で踏み、ハンドルを肩の高さから真上へ。腰を反らせない。' },
+  { key: 'ttriceps', name: 'チューブ フレンチプレス', part: 'upper', type: 'tube', step: 1,
+    how: 'ドアアンカーを上に。肘を固定したまま、前腕だけで下へ押す。二の腕の裏。' },
+
+  // 背中（引く）
+  { key: 'tlat', name: 'チューブ ラットプルダウン', part: 'back', type: 'tube', step: 3,
+    how: 'ドアアンカーを一番上に。両手を頭の上から胸の横へ引き下ろす。肩甲骨を下げる。' },
+  { key: 'trow', name: 'チューブ シーテッドロウ', part: 'back', type: 'tube', step: 4,
+    how: '長座でチューブを足裏に掛ける。肘をわき腹に沿わせて後ろへ引く。胸を張ったまま。' },
+  { key: 'tbrow', name: 'チューブ ベントオーバーロウ', part: 'back', type: 'tube', step: 4,
+    how: 'チューブを両足で踏み、上体を前に倒す。背中を丸めず、おへそへ引き上げる。' },
+  { key: 'tapart', name: 'チューブ プルアパート', part: 'back', type: 'tube', step: 1,
+    how: '両手でハンドルを持ち、胸の前で左右へ開く。肩甲骨を寄せる。アンカーは要らない。' },
+  { key: 'tface', name: 'チューブ フェイスプル', part: 'back', type: 'tube', step: 2,
+    how: 'ドアアンカーを顔の高さに。両手を顔の横へ引き、肩甲骨を寄せる。抱っこの凝りに効く。' },
+  { key: 'tpullover', name: 'チューブ プルオーバー', part: 'back', type: 'tube', step: 2,
+    how: 'ドアアンカーを上に。肘を伸ばしたまま、腕を前へ下ろす。脇の下が働く。' },
+
+  // 体幹
+  { key: 'plank', name: 'プランク', part: 'core', type: 'bw', unit: 'sec',
+    levels: ['ひざをついて', 'プランク', '片脚を上げて'],
+    how: '肘と足で体を支え、頭からかかとまで一直線。腰を反らせない。' },
+  { key: 'splank', name: 'サイドプランク', part: 'core', type: 'bw', unit: 'sec',
+    levels: ['ひざをついて', 'サイドプランク'],
+    how: '横向きで肘と足で支える。腰を落とさない。左右それぞれ。' },
+  { key: 'legraise', name: 'レッグレイズ', part: 'core', type: 'bw',
+    levels: ['ひざを曲げて', '脚を伸ばして', '床すれすれで止める'],
+    how: '仰向けで脚を上げ下げ。腰が浮かないよう、手をお尻の下に入れてもよい。' },
+  { key: 'deadbug', name: 'デッドバグ', part: 'core', type: 'bw',
+    levels: ['腕だけ', '腕と脚', '脚を伸ばして'],
+    how: '仰向けで両手両ひざを上げ、対角の手と脚をゆっくり伸ばす。腰を床につけたまま。' },
+  { key: 'roller', name: '腹筋ローラー', part: 'core', type: 'bw', gear: ['ローラー'],
+    levels: ['ひざをついて半分', 'ひざをついて', '立ちコロ'],
+    how: 'ひざをついて前へ転がす。腰が反る手前で止めて戻す。' },
+  { key: 'tchop', name: 'チューブ ウッドチョップ', part: 'core', type: 'tube', step: 1,
+    how: 'ドアアンカーを上に。斜め下へ振り下ろすようにひねる。左右それぞれ。' },
+];
+
+function exOf(key) { return EXERCISES.find(e => e.key === key) || null; }
+
+
+function maxLoad(ex) {
+  return ex.type === 'tube' ? BAND_STEPS.length - 1 : ex.levels.length - 1;
+}
+function clampLoad(ex, n) {
+  return Math.max(0, Math.min(maxLoad(ex), Number(n) || 0));
+}
+
+/* 種目の目標。保存が無ければ既定から作る */
+function rxOf(key) {
+  const ex = exOf(key);
+  if (!ex) return null;
+  const saved = state.rx && state.rx[key];
+  if (saved) return saved;
+  return {
+    load: ex.type === 'tube' ? (ex.step || 2) : 0,
+    reps: ex.unit === 'sec' ? SEC_MIN : REP_MIN + 2,
+    last: null,
+    updated: null,
+  };
+}
+
+/* 負荷の見せ方。チューブは色、自重は難易度の名前 */
+function loadLabel(key) {
+  const ex = exOf(key);
+  const r = rxOf(key);
+  if (!ex || !r) return '';
+  if (ex.type === 'tube') {
+    const st = BAND_STEPS[clampLoad(ex, r.load)];
+    return st ? st.colors.join('＋') + '（' + st.lb + 'lb）' : '';
+  }
+  return ex.levels[clampLoad(ex, r.load)] || '';
+}
+
+/* やった回数を受け取り、次回の目標を決める(ダブルプログレッション)。
+ * 目標の上限に届いたら負荷を1段上げて回数を下限に戻す。
+ * 下限に届かなければ負荷を1段下げる。その間は目標を1つ増やす。 */
+function applyResult(key, done) {
+  const ex = exOf(key);
+  if (!ex) return null;
+  const n = Number(done);
+  if (!Number.isFinite(n) || n < 0) return null;
+
+  const r = { ...rxOf(key) };
+  const sec = ex.unit === 'sec';
+  const lo = sec ? SEC_MIN : REP_MIN;
+  const hi = sec ? SEC_MAX : REP_MAX;
+  const step = sec ? SEC_STEP : 1;
+
+  r.last = n;
+  if (n >= hi && r.load < maxLoad(ex)) {
+    r.load = clampLoad(ex, r.load + 1);
+    r.reps = lo;
+  } else if (n < lo && r.load > 0) {
+    r.load = clampLoad(ex, r.load - 1);
+    r.reps = lo;
+  } else {
+    r.reps = Math.min(hi, Math.max(lo, n >= r.reps ? r.reps + step : r.reps));
+  }
+  r.updated = todayStr();
+  if (!state.rx || typeof state.rx !== 'object') state.rx = {};
+  state.rx[key] = r;
+  save();
+  return r;
+}
+
+/* 測った結果から、その部位の出発点をまとめて決める。
+ * ここで完璧に当てる必要はない。2〜3回やれば applyResult が正しい位置へ寄せる。 */
+function applyMeasure(m) {
+  if (!state.rx || typeof state.rx !== 'object') state.rx = {};
+
+  const put = (ex, load, target) => {
+    const sec = ex.unit === 'sec';
+    const lo = sec ? SEC_MIN : REP_MIN;
+    const hi = sec ? SEC_MAX : REP_MAX;
+    state.rx[ex.key] = {
+      load: clampLoad(ex, load),
+      reps: Math.min(hi, Math.max(lo, Math.round(target) || lo)),
+      last: null,
+      updated: todayStr(),
+    };
+  };
+
+  // 回数から「その難易度が合っているか」を決める。少なすぎれば下げ、多すぎれば上げる
+  const shift = n => (n < 5 ? -1 : n >= 13 ? 1 : 0);
+
+  /* 難易度や色を動かしたときは、種目の重さ自体が変わる。
+   * 測った回数をそのまま目標にすると無理が出るので、下限から始める。 */
+  const target = (n, sh) => (sh === 0 ? n - 2 : REP_MIN);
+
+  const sq = Number(m.squatReps) || 0;
+  EXERCISES.filter(e => e.part === 'lower' && e.type === 'bw')
+    .forEach(e => put(e, 1 + shift(sq), target(sq, shift(sq))));
+
+  const pu = Number(m.pushReps) || 0;
+  const puLv = Number(m.pushLevel) || 0;
+  EXERCISES.filter(e => e.part === 'upper' && e.type === 'bw')
+    .forEach(e => put(e, puLv + shift(pu), target(pu, shift(pu))));
+
+  const rowReps = Number(m.rowReps) || 0;
+  const rowStep = Number(m.rowStep) || 2;
+  EXERCISES.filter(e => e.part === 'back')
+    .forEach(e => put(e, rowStep + shift(rowReps), target(rowReps, shift(rowReps))));
+
+  const sec = Number(m.plankSec) || 0;
+  EXERCISES.filter(e => e.part === 'core' && e.type === 'bw')
+    .forEach(e => put(e, sec < 20 ? 0 : sec >= 60 ? 2 : 1, e.unit === 'sec' ? sec - 5 : 10));
+
+  // 残り(チューブの上半身・体幹)は既定のまま。やれば自動で寄る
+  EXERCISES.filter(e => e.type === 'tube' && !state.rx[e.key])
+    .forEach(e => put(e, e.step || 2, 10));
+
+  state.measured = todayStr();
+  save();
+}
+
+/* 今日のメニュー。部位は1本目と同じローテ、種目数は選んだ時間で決まる */
+function menuFor(minutes) {
+  /* 今日すでに記録があれば、その部位のまま続ける。
+   * nextPart() をそのまま使うと、1種目やった時点で残りが翌日の部位に変わってしまう。 */
+  const first = logsOf(todayStr()).find(l => l.slot === 1);
+  const part = first ? first.part : nextPart();
+  const n = Math.max(1, Math.round((Number(minutes) || MIN_PER_EX) / MIN_PER_EX));
+  const pool = EXERCISES.filter(e => e.part === part);
+  if (!pool.length) return { part, items: [] };
+
+  // ローラーは2日に1回まで(動画のときからの決まりを引き継ぐ)
+  const usable = pool.filter(e => e.key !== 'roller' || rollerOk());
+  const list = usable.length ? usable : pool;
+
+  // 今日やった分は上に残す。消すと何をやったか分からなくなる
+  const doneKeys = logsOf(todayStr()).filter(l => l.ex).map(l => l.ex);
+  const done = doneKeys.map(exOf).filter(e => e && e.part === part);
+
+  // 最近やった種目を後ろへ回して、同じものばかりにならないようにする
+  const recent = (state.logs || []).filter(l => l.ex).slice(-12).map(l => l.ex);
+  const score = e => {
+    const i = recent.lastIndexOf(e.key);
+    return i < 0 ? -1 : i;
+  };
+
+  const rest = list
+    .filter(e => !doneKeys.includes(e.key))
+    .sort((a, b) => score(a) - score(b))
+    .slice(0, Math.max(0, n - done.length));
+
+  return { part, items: [...done, ...rest] };
+}
+
+/* メニューでやった分の記録。動画の記録(logs)と同じ箱に入れる。
+ * 動画の記録と区別できるよう ex(種目キー)を持たせる。 */
+function recordEx(key, done) {
+  const ex = exOf(key);
+  if (!ex) return;
+  const before = rxOf(key);
+  state.logs.push({
+    d: todayStr(), id: 'ex:' + key, ex: key, part: ex.part,
+    level: String(before.load), spare: null, slot: 1, done: Number(done),
+  });
+  applyResult(key, done);
+}
+
+function doneExToday(key) {
+  return logsOf(todayStr()).some(l => l.ex === key);
+}
+
+
+/* ---------- メニューの画面 ---------- */
+
+function ytSearch(q) {
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+}
+
+/* 測るための画面。4種目の結果を入れると、全種目の出発点が決まる */
+function measureFormHtml() {
+  const push = exOf('push');
+  const pushOpts = push.levels
+    .map((n, i) => `<option value="${i}"${i === 1 ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+  // 測るときは1本だけ使う。組み合わせは普段のメニューから
+  const single = BAND_STEPS.filter(st => st.colors.length === 1);
+  const bandOpts = single
+    .map(st => `<option value="${BAND_STEPS.indexOf(st)}"${st.lb === 20 ? ' selected' : ''}>${st.colors[0]}（${st.lb}lb）</option>`).join('');
+
+  return `
+  <div class="card">
+    <h2 class="sec-title">実力を測る</h2>
+    <p class="note">4種目を、できなくなるまで1セットずつ。間に2分休む。所要20〜30分。</p>
+    <p class="note warn">限界までやるので翌日に筋肉痛が出ます。予定のない日に。</p>
+
+    <div class="mrow">
+      <span class="mname">スクワット</span>
+      <input id="m-squat" class="num" type="number" inputmode="numeric" min="0" max="200"> 回
+    </div>
+
+    <div class="mrow">
+      <span class="mname">腕立て</span>
+      <select id="m-push-lv">${pushOpts}</select>
+      <input id="m-push" class="num" type="number" inputmode="numeric" min="0" max="200"> 回
+    </div>
+
+    <div class="mrow">
+      <span class="mname">チューブ シーテッドロウ</span>
+      <select id="m-row-step">${bandOpts}</select>
+      <input id="m-row" class="num" type="number" inputmode="numeric" min="0" max="200"> 回
+    </div>
+
+    <div class="mrow">
+      <span class="mname">プランク</span>
+      <input id="m-plank" class="num" type="number" inputmode="numeric" min="0" max="600"> 秒
+    </div>
+
+    <button id="btn-measure-save" class="btn primary wide">決める</button>
+  </div>`;
+}
+
+function exCardHtml(ex) {
+  const r = rxOf(ex.key);
+  const sec = ex.unit === 'sec';
+  const unit = sec ? '秒' : '回';
+  const done = logsOf(todayStr()).find(l => l.ex === ex.key);
+
+  if (done) {
+    const now = rxOf(ex.key);
+    return `
+    <div class="card ex-card done">
+      <p class="vtitle">${escapeHtml(ex.name)}</p>
+      <p class="ex-done">やりました　${done.done}${unit}</p>
+      <p class="note">次は ${now.reps}${unit}／${escapeHtml(loadLabel(ex.key))}</p>
+    </div>`;
+  }
+
+  return `
+  <div class="card ex-card">
+    <p class="vtitle">${escapeHtml(ex.name)}</p>
+    <p class="ex-target"><strong>${r.reps}${unit}</strong> × ${SETS}セット</p>
+    <p class="ex-load">${escapeHtml(loadLabel(ex.key))}</p>
+    <p class="note">${escapeHtml(ex.how)}</p>
+    ${r.last ? `<p class="note">前回 ${r.last}${unit}</p>` : ''}
+    <div class="ex-input">
+      <input class="num" type="number" inputmode="numeric" min="0" max="600"
+             data-ex-reps="${escapeHtml(ex.key)}" placeholder="${r.reps}">
+      <span class="unit">${unit}</span>
+      <button class="btn primary" data-ex-done="${escapeHtml(ex.key)}">記録</button>
+    </div>
+    <div class="btn-row sub-row">
+      <a class="btn small" href="${ytSearch(ex.name + ' やり方')}" target="_blank" rel="noopener">お手本をさがす</a>
+    </div>
+  </div>`;
+}
+
+function renderMenu() {
+  const el = $('#menu-area');
+  if (!el) return;
+
+  if (!state.measured) { el.innerHTML = measureFormHtml(); return; }
+
+  const min = TIME_CHOICES.includes(state.rxMin) ? state.rxMin : 15;
+  const menu = menuFor(min);
+  const times = TIME_CHOICES
+    .map(t => `<button type="button" class="time-tile${t === min ? ' on' : ''}" data-min="${t}">${t}分</button>`)
+    .join('');
+
+  const cards = menu.items.length
+    ? menu.items.map(exCardHtml).join('')
+    : '<div class="card"><p class="note">出せる種目がありません。</p></div>';
+
+  el.innerHTML = `
+    <div class="time-grid">${times}</div>
+    <h2 class="sec-title">${escapeHtml(PART_LABEL[menu.part] || '')}</h2>
+    ${cards}
+    <div class="btn-row">
+      <button id="btn-remeasure" class="btn small">測り直す</button>
+    </div>`;
+}
+
+function bindMenu() {
+  document.addEventListener('click', ev => {
+    const t = ev.target.closest('[data-min]');
+    if (t) {
+      state.rxMin = Number(t.dataset.min);
+      save();
+      renderMenu();
+      return;
+    }
+
+    const d = ev.target.closest('[data-ex-done]');
+    if (d) {
+      const key = d.dataset.exDone;
+      const input = document.querySelector(`[data-ex-reps="${key}"]`);
+      const v = input && input.value !== '' ? Number(input.value) : rxOf(key).reps;
+      if (!Number.isFinite(v) || v < 0) { toast('回数を入れてください'); return; }
+      if (doneExToday(key)) { toast('今日はもう記録しています'); return; }
+      recordEx(key, v);
+      renderMenu();
+      render();
+      toast('記録しました');
+      return;
+    }
+
+    if (ev.target.closest('#btn-measure-save')) {
+      const num = id => Number(($(id) || {}).value);
+      const m = {
+        squatReps: num('#m-squat'),
+        pushLevel: num('#m-push-lv'),
+        pushReps: num('#m-push'),
+        rowStep: num('#m-row-step'),
+        rowReps: num('#m-row'),
+        plankSec: num('#m-plank'),
+      };
+      if (![m.squatReps, m.pushReps, m.rowReps, m.plankSec].every(Number.isFinite)) {
+        toast('4つとも入れてください');
+        return;
+      }
+      applyMeasure(m);
+      renderMenu();
+      toast('メニューを作りました');
+      return;
+    }
+
+    if (ev.target.closest('#btn-remeasure')) {
+      if (!confirm('測り直します。いまの目標はすべて作り直されます。よろしいですか。')) return;
+      state.measured = null;
+      state.rx = {};
+      save();
+      renderMenu();
+    }
+  });
+}
+
 /* ---------- 起動 ---------- */
 
 load();
 fbLoad();
 applyLinkPick();
 bind();
+bindMenu();
 watchFullscreen();
 render();
 

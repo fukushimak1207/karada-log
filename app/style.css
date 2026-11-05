@@ -391,3 +391,28 @@ body.no-scroll { overflow: hidden; }
 .tile-sub { font-size: .95rem; font-weight: 700; }
 .tile-len { font-size: .8rem; color: var(--ink-sub); }
 .stretch-tile.on .tile-len { color: inherit; opacity: .8; }
+
+/* ---- 処方型メニュー ---- */
+.time-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.time-tile { padding: 12px 4px; background: var(--card); color: var(--ink);
+             border: 1px solid var(--line); border-radius: var(--radius);
+             font-size: 1rem; font-weight: 700; cursor: pointer; }
+.time-tile.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+
+.ex-card + .ex-card { margin-top: 12px; }
+.ex-card.done { opacity: .72; }
+.ex-target { margin: 4px 0 0; font-size: 1.15rem; }
+.ex-target strong { font-size: 1.6rem; }
+.ex-load { margin: 2px 0 6px; color: var(--accent); font-weight: 700; }
+.ex-done { margin: 4px 0; font-size: 1.15rem; font-weight: 700; }
+.ex-input { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.ex-input .unit { color: var(--ink-sub); }
+.num { width: 5em; padding: 10px; font-size: 1.1rem; text-align: right;
+       background: var(--card); color: var(--ink);
+       border: 1px solid var(--line); border-radius: var(--radius); }
+
+.mrow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.mname { flex: 1 1 100%; font-weight: 700; }
+.mrow select { padding: 10px; background: var(--card); color: var(--ink);
+               border: 1px solid var(--line); border-radius: var(--radius); }
+.note.warn { color: var(--accent); }
