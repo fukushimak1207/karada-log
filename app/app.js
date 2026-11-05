@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v23';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v24';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -99,6 +99,11 @@ const DEFAULT_VIDEOS = [
   { id: '-9VBPdxQyTM', name: 'チューブで広い背中 4分', len: '4:32', part: 'back', sub: '背中', level: 'easy' , gear: ['チューブ'] },
   { id: 'KV14VKiSwUs', name: 'チューブで背筋 10種目', len: '5:28', part: 'back', sub: '背中', level: 'normal' , gear: ['チューブ'] },
   { id: 'MO80I4048yI', name: 'チューブで背中全体 5種目', len: '6:07', part: 'back', sub: '背中', level: 'hard' , gear: ['チューブ'] },
+  // ドアアンカーで「引く方向」を作る種目(2026-11-05)。本人の持っているチューブ
+  // (ハンドル・ドアアンカー・アンクルストラップ付き)に合わせて足した。
+  { id: 'LERZe_yu3Ig', name: 'ドアアンカーで背中 3種目', len: '3:49', part: 'back', sub: '背中', level: 'easy' , gear: ['チューブ'] },
+  { id: 'T1AXbpU1shM', name: 'チューブで広い背中（初心者向け）', len: '6:13', part: 'back', sub: '背中', level: 'easy' , gear: ['チューブ'] },
+  { id: 'udmQr-ECP1M', name: 'チューブで広背筋 12分（初心者向け）', len: '12:49', part: 'back', sub: '背中', level: 'normal' , gear: ['チューブ'] },
   { id: 'gSg5scZMwGo', name: 'チューブで上半身 6種目（背中・腕・肩）', len: '7:12', part: 'upper', sub: '上半身まとめて', level: 'normal' , gear: ['チューブ'] },
 
   // 下半身 — 体で一番大きい筋群。ここが筋肉量に一番効く
