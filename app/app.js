@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v26';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v27';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -1616,66 +1616,67 @@ const TIME_CHOICES = [5, 10, 15, 20];
 const SEC_MIN = 20, SEC_MAX = 60, SEC_STEP = 5;
 
 /* 種目。levels は自重の難易度(弱い順)。step はチューブの負荷段(BAND_STEPS の番号)。
- * how はやり方。動画の代わりに、読んで分かる長さにする。 */
+ * how はやり方。動画の代わりに、読んで分かる長さにする。
+ * ref はお手本の動画。種目1つだけを解説しているものを選んであるので、頭から見ればよい。 */
 const EXERCISES = [
   // 下半身
-  { key: 'squat', name: 'スクワット', part: 'lower', type: 'bw',
+  { key: 'squat', ref: 'Up9TBV6gnJ8', name: 'スクワット', part: 'lower', type: 'bw',
     levels: ['椅子に座って立つ', 'スクワット', '片脚を椅子に乗せて'],
     how: '足は肩幅。お尻を後ろへ引きながら下ろす。ひざがつま先より前に出すぎないように。' },
-  { key: 'hip', name: 'ヒップリフト', part: 'lower', type: 'bw',
+  { key: 'hip', ref: 'URkCqPODZcE', name: 'ヒップリフト', part: 'lower', type: 'bw',
     levels: ['両脚', '片脚', '片脚＋上で3秒止める'],
     how: '仰向けでひざを立て、お尻を持ち上げる。上で尻に力を入れてから下ろす。' },
-  { key: 'calf', name: 'カーフレイズ', part: 'lower', type: 'bw',
+  { key: 'calf', ref: 'oVbkeODJNSE', name: 'カーフレイズ', part: 'lower', type: 'bw',
     levels: ['両脚', '片脚', '片脚＋段差に乗って'],
     how: 'かかとを上げてつま先立ち。上で止めて、ゆっくり下ろす。' },
-  { key: 'tdead', name: 'チューブ デッドリフト', part: 'lower', type: 'tube', step: 5,
+  { key: 'tdead', ref: '3Ep1FkBS5FY', name: 'チューブ デッドリフト', part: 'lower', type: 'tube', step: 5,
     how: 'チューブを両足で踏み、ハンドルを持つ。背中を丸めずお尻を引いて下ろし、立ち上がる。' },
 
   // 上半身（押す）
-  { key: 'push', name: '腕立て', part: 'upper', type: 'bw',
+  { key: 'push', ref: '5SBAn4WnHWI', name: '腕立て', part: 'upper', type: 'bw',
     levels: ['壁に手をついて', 'ひざをついて', '腕立て', '足を台に乗せて'],
     how: '手は肩幅より少し外。体を一直線に保ったまま下ろす。肘は45度くらいに引く。' },
-  { key: 'pike', name: 'パイクプッシュアップ', part: 'upper', type: 'bw',
+  { key: 'pike', ref: '7oIAgIANYr8', name: 'パイクプッシュアップ', part: 'upper', type: 'bw',
     levels: ['ひざをついて', '腰を高く上げて', '足を台に乗せて'],
     how: 'お尻を高く上げた山の形から、頭を床へ下ろす。肩に効かせる種目。' },
-  { key: 'tpress', name: 'チューブ チェストプレス', part: 'upper', type: 'tube', step: 4,
+  { key: 'tpress', ref: 'HbHkX8Ldwd4', name: 'チューブ チェストプレス', part: 'upper', type: 'tube', step: 4,
     how: 'ドアアンカーを背中側、胸の高さに。両手を前へ押し出す。胸を張ったまま。' },
-  { key: 'tshoulder', name: 'チューブ ショルダープレス', part: 'upper', type: 'tube', step: 2,
+  { key: 'tshoulder', ref: '1UIwVYKGNjw', name: 'チューブ ショルダープレス', part: 'upper', type: 'tube', step: 2,
     how: 'チューブを足で踏み、ハンドルを肩の高さから真上へ。腰を反らせない。' },
-  { key: 'ttriceps', name: 'チューブ フレンチプレス', part: 'upper', type: 'tube', step: 1,
+  { key: 'ttriceps', ref: 'zznC3G507DQ', name: 'チューブ フレンチプレス', part: 'upper', type: 'tube', step: 1,
     how: 'ドアアンカーを上に。肘を固定したまま、前腕だけで下へ押す。二の腕の裏。' },
 
   // 背中（引く）
-  { key: 'tlat', name: 'チューブ ラットプルダウン', part: 'back', type: 'tube', step: 3,
+  { key: 'tlat', ref: '4sNVdIwGqfM', name: 'チューブ ラットプルダウン', part: 'back', type: 'tube', step: 3,
     how: 'ドアアンカーを一番上に。両手を頭の上から胸の横へ引き下ろす。肩甲骨を下げる。' },
-  { key: 'trow', name: 'チューブ シーテッドロウ', part: 'back', type: 'tube', step: 4,
+  { key: 'trow', ref: 'XfQd0QojYqU', name: 'チューブ シーテッドロウ', part: 'back', type: 'tube', step: 4,
     how: '長座でチューブを足裏に掛ける。肘をわき腹に沿わせて後ろへ引く。胸を張ったまま。' },
-  { key: 'tbrow', name: 'チューブ ベントオーバーロウ', part: 'back', type: 'tube', step: 4,
+  { key: 'tbrow', ref: 'LXYWCQiLT8Q', name: 'チューブ ベントオーバーロウ', part: 'back', type: 'tube', step: 4,
     how: 'チューブを両足で踏み、上体を前に倒す。背中を丸めず、おへそへ引き上げる。' },
-  { key: 'tapart', name: 'チューブ プルアパート', part: 'back', type: 'tube', step: 1,
+  { key: 'tapart', ref: 'PNM_OgNcwB8', name: 'チューブ プルアパート', part: 'back', type: 'tube', step: 1,
     how: '両手でハンドルを持ち、胸の前で左右へ開く。肩甲骨を寄せる。アンカーは要らない。' },
-  { key: 'tface', name: 'チューブ フェイスプル', part: 'back', type: 'tube', step: 2,
+  { key: 'tface', ref: 'Bx-cGh7ExzA', name: 'チューブ フェイスプル', part: 'back', type: 'tube', step: 2,
     how: 'ドアアンカーを顔の高さに。両手を顔の横へ引き、肩甲骨を寄せる。抱っこの凝りに効く。' },
-  { key: 'tpullover', name: 'チューブ プルオーバー', part: 'back', type: 'tube', step: 2,
+  { key: 'tpullover', ref: '_bYXuRTq8wQ', name: 'チューブ プルオーバー', part: 'back', type: 'tube', step: 2,
     how: 'ドアアンカーを上に。肘を伸ばしたまま、腕を前へ下ろす。脇の下が働く。' },
 
   // 体幹
-  { key: 'plank', name: 'プランク', part: 'core', type: 'bw', unit: 'sec',
+  { key: 'plank', ref: 'UgkU2S8VUX4', name: 'プランク', part: 'core', type: 'bw', unit: 'sec',
     levels: ['ひざをついて', 'プランク', '片脚を上げて'],
     how: '肘と足で体を支え、頭からかかとまで一直線。腰を反らせない。' },
-  { key: 'splank', name: 'サイドプランク', part: 'core', type: 'bw', unit: 'sec',
+  { key: 'splank', ref: 'AKUGmosS7fM', name: 'サイドプランク', part: 'core', type: 'bw', unit: 'sec',
     levels: ['ひざをついて', 'サイドプランク'],
     how: '横向きで肘と足で支える。腰を落とさない。左右それぞれ。' },
-  { key: 'legraise', name: 'レッグレイズ', part: 'core', type: 'bw',
+  { key: 'legraise', ref: 'y_sZA8ixCBw', name: 'レッグレイズ', part: 'core', type: 'bw',
     levels: ['ひざを曲げて', '脚を伸ばして', '床すれすれで止める'],
     how: '仰向けで脚を上げ下げ。腰が浮かないよう、手をお尻の下に入れてもよい。' },
-  { key: 'deadbug', name: 'デッドバグ', part: 'core', type: 'bw',
+  { key: 'deadbug', ref: 'Wb7_mqepkfw', name: 'デッドバグ', part: 'core', type: 'bw',
     levels: ['腕だけ', '腕と脚', '脚を伸ばして'],
     how: '仰向けで両手両ひざを上げ、対角の手と脚をゆっくり伸ばす。腰を床につけたまま。' },
-  { key: 'roller', name: '腹筋ローラー', part: 'core', type: 'bw', gear: ['ローラー'],
+  { key: 'roller', ref: '2qj-0vvKShY', name: '腹筋ローラー', part: 'core', type: 'bw', gear: ['ローラー'],
     levels: ['ひざをついて半分', 'ひざをついて', '立ちコロ'],
     how: 'ひざをついて前へ転がす。腰が反る手前で止めて戻す。' },
-  { key: 'tchop', name: 'チューブ ウッドチョップ', part: 'core', type: 'tube', step: 1,
+  { key: 'tchop', ref: 'l9bah5HOFjA', name: 'チューブ ウッドチョップ', part: 'core', type: 'tube', step: 1,
     how: 'ドアアンカーを上に。斜め下へ振り下ろすようにひねる。左右それぞれ。' },
 ];
 
@@ -1854,6 +1855,10 @@ function ytSearch(q) {
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
 }
 
+function ytWatch(id) {
+  return 'https://www.youtube.com/watch?v=' + encodeURIComponent(id);
+}
+
 /* 測るための画面。4種目の結果を入れると、全種目の出発点が決まる */
 function measureFormHtml() {
   const push = exOf('push');
@@ -1926,7 +1931,7 @@ function exCardHtml(ex) {
       <button class="btn primary" data-ex-done="${escapeHtml(ex.key)}">記録</button>
     </div>
     <div class="btn-row sub-row">
-      <a class="btn small" href="${ytSearch(ex.name + ' やり方')}" target="_blank" rel="noopener">お手本をさがす</a>
+      <a class="btn small" href="${ex.ref ? ytWatch(ex.ref) : ytSearch(ex.name + ' やり方')}" target="_blank" rel="noopener">お手本</a>
     </div>
   </div>`;
 }
