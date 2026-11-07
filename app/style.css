@@ -416,3 +416,16 @@ body.no-scroll { overflow: hidden; }
 .mrow select { padding: 10px; background: var(--card); color: var(--ink);
                border: 1px solid var(--line); border-radius: var(--radius); }
 .note.warn { color: var(--accent); }
+
+/* ---- 実行中の画面 ---- */
+#run { position: fixed; inset: 0; z-index: 50; display: flex;
+       flex-direction: column; align-items: center; justify-content: center;
+       gap: 4px; padding: 24px 16px; text-align: center; background: var(--bg); }
+#run[hidden] { display: none; }
+#run-name { margin: 0; font-size: 1.5rem; font-weight: 700; }
+#run-sub { margin: 0; color: var(--ink-sub); }
+#run-num { margin: 8px 0; font-size: 5.5rem; font-weight: 700; line-height: 1;
+           font-variant-numeric: tabular-nums; color: var(--accent); }
+#run-count { margin: 0; font-size: 1.5rem; font-weight: 700; }
+#run-next { margin: 8px 0 20px; color: var(--ink-sub); }
+#run .btn-row { width: 100%; max-width: 420px; }

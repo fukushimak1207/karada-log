@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v28';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v29';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -1869,6 +1869,56 @@ function doneExToday(key) {
 }
 
 
+
+/* ---------- 一連の実行(タイマー) ---------- */
+
+const TEMPO_SEC = 3;   // 回数の種目。1回にかける秒数(下ろす2秒・上げる1秒)
+const REST_SET = 60;   // セット間の休み(秒)
+const REST_EX = 90;    // 種目を変えるときの休み(秒)
+const LEAD_SEC = 5;    // 始まる前、構えるための時間(秒)
+
+/* メニューを、頭から順に再生するだけの手順に展開する。
+ * 画面はこの配列を上から流すだけなので、進行の判断を1か所に閉じられる。 */
+function buildSession(items) {
+  const steps = [];
+  if (!items || !items.length) return steps;
+
+  steps.push({ kind: 'lead', sec: LEAD_SEC, next: items[0].name });
+
+  items.forEach((ex, i) => {
+    const r = rxOf(ex.key);
+    const sec = ex.unit === 'sec';
+    const last = i === items.length - 1;
+
+    for (let set = 1; set <= SETS; set++) {
+      steps.push({
+        kind: 'work',
+        key: ex.key,
+        name: ex.name,
+        load: loadLabel(ex.key),
+        set: set,
+        unit: sec ? 'sec' : 'rep',
+        target: r.reps,                               // 秒なら秒数、回数なら回数
+        sec: sec ? r.reps : r.reps * TEMPO_SEC,       // この手順にかかる秒数
+      });
+      if (last && set === SETS) break;
+      steps.push({
+        kind: 'rest',
+        sec: set === SETS ? REST_EX : REST_SET,
+        next: set === SETS ? items[i + 1].name : ex.name,
+      });
+    }
+  });
+  return steps;
+}
+
+/* 経過秒から、実際にできた数を出す。回数の種目は鳴った回数で数える */
+function doneFrom(step, elapsed) {
+  const e = Math.max(0, Math.floor(elapsed));
+  if (step.unit === 'sec') return Math.min(step.target, e);
+  return Math.min(step.target, Math.floor(e / TEMPO_SEC));
+}
+
 /* ---------- メニューの画面 ---------- */
 
 function ytSearch(q) {
@@ -1974,6 +2024,7 @@ function renderMenu() {
 
   el.innerHTML = `
     <div class="time-grid">${times}</div>
+    <button id="btn-run" class="btn primary wide">はじめる</button>
     <h2 class="sec-title">${escapeHtml(PART_LABEL[menu.part] || '')}</h2>
     ${cards}
     <div class="btn-row">
@@ -1990,6 +2041,8 @@ function bindMenu() {
       renderMenu();
       return;
     }
+
+    if (ev.target.closest('#btn-run')) { startRun(); return; }
 
     const d = ev.target.closest('[data-ex-done]');
     if (d) {
@@ -2035,6 +2088,149 @@ function bindMenu() {
   });
 }
 
+
+/* ---------- 実行中の画面 ---------- */
+
+let run = null;        // 実行中の状態。終わったら null に戻す
+let runTimer = null;
+let audioCtx = null;
+let wakeLock = null;
+
+/* 音は端末に持たせる。ファイルを置くとオフラインで鳴らないことがある */
+function beep(freq, ms) {
+  if (!audioCtx) return;
+  try {
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.frequency.value = freq;
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+    o.start(t);
+    o.stop(t + ms / 1000 + 0.02);
+  } catch (e) {}
+}
+
+function buzz(ms) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
+}
+
+/* 運動中は画面を消させない。対応していない端末では何も起きない */
+function keepAwake(on) {
+  try {
+    if (on && navigator.wakeLock) {
+      navigator.wakeLock.request('screen').then(w => { wakeLock = w; }).catch(() => {});
+    } else if (!on && wakeLock) {
+      wakeLock.release();
+      wakeLock = null;
+    }
+  } catch (e) {}
+}
+
+function startRun() {
+  const min = TIME_CHOICES.includes(state.rxMin) ? state.rxMin : 15;
+  const items = menuFor(min).items.filter(e => !doneExToday(e.key));
+  if (!items.length) { toast('今日はもう終わっています'); return; }
+
+  // 音は画面を触った流れでしか出せないので、ここで用意する
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+
+  run = { steps: buildSession(items), i: 0, got: {}, endAt: 0, tick: -1 };
+  keepAwake(true);
+  $('#run').hidden = false;
+  openStep();
+  runTimer = setInterval(runTick, 200);
+}
+
+function openStep() {
+  const st = run.steps[run.i];
+  run.endAt = Date.now() + st.sec * 1000;
+  run.tick = -1;
+  renderRun(st, st.sec);   // 最初の1目盛りを待たずに出す
+  if (st.kind !== 'lead') { beep(990, 120); buzz(80); }
+}
+
+/* 残り秒は時刻の差から出す。数え上げる作りだと、画面が消えた間にずれる */
+function runTick() {
+  if (!run) return;
+  const st = run.steps[run.i];
+  const left = Math.ceil((run.endAt - Date.now()) / 1000);
+
+  if (left !== run.tick) {
+    run.tick = left;
+    onSecond(st, left);
+    renderRun(st, left);
+  }
+  if (left <= 0) nextStep(false);
+}
+
+function onSecond(st, left) {
+  if (left <= 0) { beep(1320, 320); buzz(220); return; }
+  if (left <= 3) { beep(880, 90); return; }
+  // 回数の種目は、1回ぶんの間隔で鳴らす。その音に合わせて動く
+  if (st.kind === 'work' && st.unit === 'rep') {
+    const passed = st.sec - left;
+    if (passed > 0 && passed % TEMPO_SEC === 0) beep(660, 70);
+  }
+}
+
+function nextStep(early) {
+  const st = run.steps[run.i];
+  if (st.kind === 'work') {
+    const passed = early ? st.sec - Math.max(0, Math.ceil((run.endAt - Date.now()) / 1000)) : st.sec;
+    (run.got[st.key] = run.got[st.key] || []).push(doneFrom(st, passed));
+  }
+  run.i += 1;
+  if (run.i >= run.steps.length) { finishRun(); return; }
+  openStep();
+}
+
+/* 3セットのうち一番少なかった数を記録する。
+ * 全セット目標に届いて初めて目標が上がる、という数え方にそろえるため。 */
+function finishRun() {
+  const got = run ? run.got : {};
+  clearInterval(runTimer);
+  runTimer = null;
+  keepAwake(false);
+  try { if (audioCtx) audioCtx.close(); } catch (e) {}
+  audioCtx = null;
+  run = null;
+  $('#run').hidden = true;
+
+  let n = 0;
+  Object.keys(got).forEach(key => {
+    // 0 のセットは「飛ばした」とみなして数えない。記録すると負荷が下がってしまう
+    const vals = got[key].filter(v => v > 0);
+    if (doneExToday(key) || !vals.length) return;
+    recordEx(key, Math.min.apply(null, vals));
+    n += 1;
+  });
+  renderMenu();
+  render();
+  toast(n ? n + '種目を記録しました' : 'やめました');
+}
+
+function renderRun(st, left) {
+  const sec = Math.max(0, left);
+  $('#run-name').textContent = st.kind === 'work' ? st.name : st.kind === 'rest' ? '休み' : 'はじめます';
+  $('#run-sub').textContent = st.kind === 'work'
+    ? st.set + 'セット目　' + st.target + (st.unit === 'sec' ? '秒' : '回') + '　' + st.load
+    : '';
+  $('#run-num').textContent = sec;
+  $('#run-count').textContent = st.kind === 'work' && st.unit === 'rep'
+    ? doneFrom(st, st.sec - sec) + ' / ' + st.target + '回'
+    : '';
+  $('#run-next').textContent = st.next ? '次は ' + st.next : '';
+}
+
+function bindRun() {
+  $('#run-skip').addEventListener('click', () => { if (run) nextStep(true); });
+  $('#run-stop').addEventListener('click', () => { if (run) finishRun(); });
+}
+
 /* ---------- 起動 ---------- */
 
 load();
@@ -2042,6 +2238,7 @@ fbLoad();
 applyLinkPick();
 bind();
 bindMenu();
+bindRun();
 watchFullscreen();
 render();
 
