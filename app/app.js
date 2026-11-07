@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v29';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v30';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2001,6 +2001,7 @@ function exCardHtml(ex) {
       <button class="btn primary" data-ex-done="${escapeHtml(ex.key)}">記録</button>
     </div>
     <div class="btn-row sub-row">
+      <button class="btn small" data-ex-run="${escapeHtml(ex.key)}">はじめる</button>
       <a class="btn small" href="${ex.ref ? ytWatch(ex.ref) : ytSearch(ex.name + ' やり方')}" target="_blank" rel="noopener">お手本</a>
     </div>
   </div>`;
@@ -2024,7 +2025,7 @@ function renderMenu() {
 
   el.innerHTML = `
     <div class="time-grid">${times}</div>
-    <button id="btn-run" class="btn primary wide">はじめる</button>
+    <button id="btn-run" class="btn primary wide">全部</button>
     <h2 class="sec-title">${escapeHtml(PART_LABEL[menu.part] || '')}</h2>
     ${cards}
     <div class="btn-row">
@@ -2043,6 +2044,9 @@ function bindMenu() {
     }
 
     if (ev.target.closest('#btn-run')) { startRun(); return; }
+
+    const rn = ev.target.closest('[data-ex-run]');
+    if (rn) { startRun(rn.dataset.exRun); return; }
 
     const d = ev.target.closest('[data-ex-done]');
     if (d) {
@@ -2130,10 +2134,12 @@ function keepAwake(on) {
   } catch (e) {}
 }
 
-function startRun() {
+/* key を渡せばその種目だけ、渡さなければメニューを頭から流す */
+function startRun(key) {
   const min = TIME_CHOICES.includes(state.rxMin) ? state.rxMin : 15;
-  const items = menuFor(min).items.filter(e => !doneExToday(e.key));
-  if (!items.length) { toast('今日はもう終わっています'); return; }
+  const pick = key ? menuFor(min).items.filter(e => e.key === key) : menuFor(min).items;
+  const items = pick.filter(e => !doneExToday(e.key));
+  if (!items.length) { toast(key ? '今日はもう記録しています' : '今日はもう終わっています'); return; }
 
   // 音は画面を触った流れでしか出せないので、ここで用意する
   try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
