@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v32';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v33';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -548,6 +548,22 @@ function setSpare(hasSpare) {
 function undoToday() {
   const d = todayStr();
   const before = state.logs.length;
+  const gone = state.logs.filter(l => l.d === d);
+
+  /* 記録を消すだけだと、上がった(下がった)目標が残ってしまう。
+   * 同じ種目が複数あれば、一番古いものの控えまで戻す。 */
+  gone.slice().reverse().forEach(l => {
+    if (!l.ex || !state.rx || !state.rx[l.ex]) return;
+    if (l.prev) {
+      state.rx[l.ex] = { ...l.prev };
+    } else {
+      // 控えが無い古い記録。負荷だけは戻せる
+      const n = Number(l.level);
+      if (Number.isFinite(n)) state.rx[l.ex].load = n;
+      state.rx[l.ex].last = null;
+    }
+  });
+
   state.logs = state.logs.filter(l => l.d !== d);
   state.todayPick = null;
   save();
@@ -1860,6 +1876,8 @@ function recordEx(key, done) {
   state.logs.push({
     d: todayStr(), id: 'ex:' + key, ex: key, part: ex.part,
     level: String(before.load), spare: null, slot: 1, done: Number(done),
+    // 消したときに戻せるよう、押す前の処方を控えておく
+    prev: { load: before.load, reps: before.reps, last: before.last, updated: before.updated },
   });
   applyResult(key, done);
 }
