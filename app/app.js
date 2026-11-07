@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v30';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v31';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2153,6 +2153,7 @@ function startRun(key) {
 
 function openStep() {
   const st = run.steps[run.i];
+  if (st.kind !== 'rest') run.ask = null;   // 直前のセットを直せるのは、次が始まるまで
   run.endAt = Date.now() + st.sec * 1000;
   run.tick = -1;
   renderRun(st, st.sec);   // 最初の1目盛りを待たずに出す
@@ -2161,7 +2162,7 @@ function openStep() {
 
 /* 残り秒は時刻の差から出す。数え上げる作りだと、画面が消えた間にずれる */
 function runTick() {
-  if (!run) return;
+  if (!run || run.waiting) return;
   const st = run.steps[run.i];
   const left = Math.ceil((run.endAt - Date.now()) / 1000);
 
@@ -2187,11 +2188,39 @@ function nextStep(early) {
   const st = run.steps[run.i];
   if (st.kind === 'work') {
     const passed = early ? st.sec - Math.max(0, Math.ceil((run.endAt - Date.now()) / 1000)) : st.sec;
-    (run.got[st.key] = run.got[st.key] || []).push(doneFrom(st, passed));
+    const arr = (run.got[st.key] = run.got[st.key] || []);
+    arr.push(doneFrom(st, passed));
+    /* タイマーは鳴った数を数えているだけで、体が動いたかは見ていない。
+     * 休んでいる間に、実際にできた数へ直せるようにする。 */
+    run.ask = { key: st.key, idx: arr.length - 1, name: st.name, set: st.set, unit: st.unit };
   }
   run.i += 1;
-  if (run.i >= run.steps.length) { finishRun(); return; }
+  if (run.i >= run.steps.length) { waitLast(); return; }
   openStep();
+}
+
+/* 最後のセットには休みが無いので、数を直す間を置いてから終える */
+function waitLast() {
+  run.waiting = true;
+  clearInterval(runTimer);
+  runTimer = null;
+  renderRun({ kind: 'end' }, 0);
+}
+
+function bumpAsk(d) {
+  const ask = run && run.ask;
+  if (!ask) return;
+  const step = ask.unit === 'sec' ? 5 : 1;
+  run.got[ask.key][ask.idx] = Math.max(0, run.got[ask.key][ask.idx] + d * step);
+  renderAsk();
+}
+
+function renderAsk() {
+  const ask = run && run.ask;
+  $('#run-ask').hidden = !ask;
+  if (!ask) return;
+  $('#run-ask-name').textContent = ask.name + '　' + ask.set + 'セット目';
+  $('#run-ask-val').textContent = run.got[ask.key][ask.idx] + (ask.unit === 'sec' ? '秒' : '回');
 }
 
 /* 3セットのうち一番少なかった数を記録する。
@@ -2221,20 +2250,31 @@ function finishRun() {
 
 function renderRun(st, left) {
   const sec = Math.max(0, left);
-  $('#run-name').textContent = st.kind === 'work' ? st.name : st.kind === 'rest' ? '休み' : 'はじめます';
+  const end = st.kind === 'end';
+  $('#run-name').textContent = end ? 'おつかれさま'
+    : st.kind === 'work' ? st.name
+    : st.kind === 'rest' ? '休み' : 'はじめます';
   $('#run-sub').textContent = st.kind === 'work'
     ? st.set + 'セット目　' + st.target + (st.unit === 'sec' ? '秒' : '回') + '　' + st.load
     : '';
-  $('#run-num').textContent = sec;
+  $('#run-num').textContent = end ? '' : sec;
   $('#run-count').textContent = st.kind === 'work' && st.unit === 'rep'
     ? doneFrom(st, st.sec - sec) + ' / ' + st.target + '回'
     : '';
-  $('#run-next').textContent = st.next ? '次は ' + st.next : '';
+  $('#run-next').textContent = !end && st.next ? '次は ' + st.next : '';
+  $('#run-skip').textContent = run && run.waiting ? 'おわり' : 'ここまで';
+  renderAsk();
 }
 
 function bindRun() {
-  $('#run-skip').addEventListener('click', () => { if (run) nextStep(true); });
+  $('#run-skip').addEventListener('click', () => {
+    if (!run) return;
+    if (run.waiting) { finishRun(); return; }
+    nextStep(true);
+  });
   $('#run-stop').addEventListener('click', () => { if (run) finishRun(); });
+  $('#run-ask-minus').addEventListener('click', () => bumpAsk(-1));
+  $('#run-ask-plus').addEventListener('click', () => bumpAsk(1));
 }
 
 /* ---------- 起動 ---------- */

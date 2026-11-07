@@ -429,3 +429,11 @@ body.no-scroll { overflow: hidden; }
 #run-count { margin: 0; font-size: 1.5rem; font-weight: 700; }
 #run-next { margin: 8px 0 20px; color: var(--ink-sub); }
 #run .btn-row { width: 100%; max-width: 420px; }
+
+#run-ask { margin: 4px 0 16px; }
+#run-ask[hidden] { display: none; }
+#run-ask-name { margin: 0 0 6px; color: var(--ink-sub); }
+.ask-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.ask-row .btn { min-width: 64px; font-size: 1.4rem; }
+#run-ask-val { min-width: 90px; font-size: 1.8rem; font-weight: 700;
+               font-variant-numeric: tabular-nums; }
