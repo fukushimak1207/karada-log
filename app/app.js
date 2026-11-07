@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v31';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v32';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2223,10 +2223,14 @@ function renderAsk() {
   $('#run-ask-val').textContent = run.got[ask.key][ask.idx] + (ask.unit === 'sec' ? '秒' : '回');
 }
 
-/* 3セットのうち一番少なかった数を記録する。
+function finishRun() { endRun(true); }
+function stopRun() { endRun(false); }
+
+/* keep が false なら何も記録せずに閉じる(「やめる」)。
+ * 記録するときは、3セットのうち一番少なかった数を入れる。
  * 全セット目標に届いて初めて目標が上がる、という数え方にそろえるため。 */
-function finishRun() {
-  const got = run ? run.got : {};
+function endRun(keep) {
+  const got = keep && run ? run.got : {};
   clearInterval(runTimer);
   runTimer = null;
   keepAwake(false);
@@ -2272,7 +2276,7 @@ function bindRun() {
     if (run.waiting) { finishRun(); return; }
     nextStep(true);
   });
-  $('#run-stop').addEventListener('click', () => { if (run) finishRun(); });
+  $('#run-stop').addEventListener('click', () => { if (run) stopRun(); });
   $('#run-ask-minus').addEventListener('click', () => bumpAsk(-1));
   $('#run-ask-plus').addEventListener('click', () => bumpAsk(1));
 }
