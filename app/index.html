@@ -29,12 +29,12 @@
 
 <main>
   <nav class="tabs">
-    <button class="tab on" data-tab="today">動画</button>
-    <button class="tab" data-tab="menu">メニュー</button>
+    <button class="tab" data-tab="today">動画</button>
+    <button class="tab on" data-tab="menu">メニュー</button>
     <button class="tab" data-tab="stretch">ストレッチ</button>
   </nav>
 
-  <div id="tab-today">
+  <div id="tab-today" hidden>
   <!-- 測る日などの知らせ(開いたときだけ出る。Webアプリは定時に通知を鳴らせない) -->
   <div id="notices" hidden></div>
 
@@ -93,7 +93,7 @@
   </div>
 
   <!-- 処方型メニュー(種目・回数・負荷を自分に合わせて出す) -->
-  <div id="tab-menu" hidden>
+  <div id="tab-menu">
     <div id="menu-area"></div>
   </div>
 
