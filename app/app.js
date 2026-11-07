@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v27';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v28';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -236,6 +236,7 @@ const defaultState = () => ({
   gear: {},                                           // {動画ID: [道具]} 覚えさせた分
   goal: '',                                           // 目標の数値。端末内にだけ置く(公開コードに入れない)
   backMoved: false,                                   // 背中を上半身から付け替えたか(一度だけ)
+  rollerCapped: false,                                // 立ちコロの処方を膝コロへ戻したか(一度だけ)
   rx: {},                                             // {種目キー: {load, reps, last, updated}} 処方
   measured: null,                                     // 実力を測った日。測っていなければ null
   rxMin: 15,                                          // メニューで最後に選んだ持ち時間(分)
@@ -264,6 +265,7 @@ function load() {
     if (!state.gear || typeof state.gear !== 'object') state.gear = {};
     mergeNewVideos();
     moveBackVideos();
+    capRoller();
   } catch (e) {
     console.warn('保存データを読めなかったので初期状態で始めます', e);
     state = defaultState();
@@ -428,6 +430,16 @@ function moveBackVideos() {
   if (Array.isArray(state.videos) && state.videos.length) {
     state.videos.forEach(v => { if (v && BACK_IDS.includes(v.id) && v.part === 'upper') v.part = 'back'; });
   }
+  save();
+}
+
+/* 測定で腹筋ローラーが「立ちコロ」になってしまった分を膝コロへ戻す。
+ * 測り直すと他の種目の処方まで消えるので、ここだけ一度きりで直す。 */
+function capRoller() {
+  if (state.rollerCapped) return;
+  state.rollerCapped = true;
+  const r = state.rx && state.rx.roller;
+  if (r && r.load > 1) { r.load = 1; r.reps = REP_MIN; }
   save();
 }
 
@@ -1738,8 +1750,12 @@ function applyResult(key, done) {
   } else if (n < lo && r.load > 0) {
     r.load = clampLoad(ex, r.load - 1);
     r.reps = lo;
-  } else {
-    r.reps = Math.min(hi, Math.max(lo, n >= r.reps ? r.reps + step : r.reps));
+  } else if (n >= r.reps) {
+    r.reps = Math.min(hi, r.reps + step);
+  } else if (n <= r.reps - (sec ? 10 : 3)) {
+    /* 大きく届かなかった目標は、そのままだと居座り続ける。
+     * 負荷を下げるほどではないので、目標だけ実測に寄せる。 */
+    r.reps = Math.max(lo, n);
   }
   r.updated = todayStr();
   if (!state.rx || typeof state.rx !== 'object') state.rx = {};
@@ -1787,8 +1803,12 @@ function applyMeasure(m) {
     .forEach(e => put(e, rowStep + shift(rowReps), target(rowReps, shift(rowReps))));
 
   const sec = Number(m.plankSec) || 0;
+  const coreLv = sec < 20 ? 0 : sec >= 60 ? 2 : 1;
+  /* 腹筋ローラーだけは膝コロまで。プランクが長いことと立ちコロができることは別で、
+   * 立ちコロは一度試して腰を痛めると取り返しがつかない。あとは達成度で上がる。 */
   EXERCISES.filter(e => e.part === 'core' && e.type === 'bw')
-    .forEach(e => put(e, sec < 20 ? 0 : sec >= 60 ? 2 : 1, e.unit === 'sec' ? sec - 5 : 10));
+    .forEach(e => put(e, e.key === 'roller' ? Math.min(1, coreLv) : coreLv,
+                      e.unit === 'sec' ? sec - 5 : 10));
 
   // 残り(チューブの上半身・体幹)は既定のまま。やれば自動で寄る
   EXERCISES.filter(e => e.type === 'tube' && !state.rx[e.key])
