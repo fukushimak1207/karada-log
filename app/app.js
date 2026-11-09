@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v38';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v39';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -241,6 +241,7 @@ const defaultState = () => ({
   measured: null,                                     // 実力を測った日。測っていなければ null
   rxMin: 15,                                          // メニューで最後に選んだ持ち時間(分)
   rxBackup: null,                                     // 測り直す前の処方。{rx, measured}
+  draft: null,                                        // {d, ex:{種目キー:[セットごとの数]}} 書きかけ
   restSet: 60,                                        // セット間の休み(秒)
   restEx: 90,                                         // 種目を変えるときの休み(秒)
 });
@@ -1914,6 +1915,7 @@ function recordEx(key, done, sets) {
     // 消したときに戻せるよう、押す前の処方を控えておく
     prev: { load: before.load, reps: before.reps, last: before.last, updated: before.updated },
   });
+  clearDraft(key);
   applyResult(key, done);
 }
 
@@ -1954,6 +1956,35 @@ function restSec(which) {
   const n = Number(which === 'ex' ? state.restEx : state.restSet);
   if (Number.isFinite(n) && n >= 0) return n;
   return which === 'ex' ? REST_EX : REST_SET;
+}
+
+/* 何セット目のどちら側か、を順番に並べる。画面も手順もこれを元にする */
+function setSlots(ex) {
+  const sides = sidesOf(ex);
+  const out = [];
+  for (let set = 1; set <= setsOf(ex.key); set++) {
+    sides.forEach(side => out.push({ set: set, side: side }));
+  }
+  return out;
+}
+
+/* 書きかけの数。日付が変わっていたら捨てる */
+function draftOf(key) {
+  if (!state.draft || state.draft.d !== todayStr()) state.draft = { d: todayStr(), ex: {} };
+  if (!state.draft.ex[key]) state.draft.ex[key] = [];
+  return state.draft.ex[key];
+}
+
+function setDraft(key, idx, v) {
+  const a = draftOf(key);
+  if (v === '' || v == null) a[idx] = null;
+  else a[idx] = Math.max(0, Math.min(600, Math.round(Number(v) || 0)));
+  save();
+}
+
+function clearDraft(key) {
+  if (state.draft && state.draft.ex) delete state.draft.ex[key];
+  save();
 }
 
 function buildSession(items) {
@@ -2086,11 +2117,18 @@ function exCardHtml(ex) {
     <div class="btn-row">
       <button class="btn primary wide" data-ex-run="${escapeHtml(ex.key)}">はじめる</button>
     </div>
-    <div class="ex-input">
-      <input class="num" type="number" inputmode="numeric" min="0" max="600"
-             data-ex-reps="${escapeHtml(ex.key)}" placeholder="${r.reps}">
-      <span class="unit">${unit}</span>
-      <button class="btn" data-ex-done="${escapeHtml(ex.key)}">記録</button>
+    <div class="ex-sets">
+      ${setSlots(ex).map((sl, i) => `
+      <div class="set-row">
+        <span class="set-name">${sl.set}セット目${sl.side ? '　' + sl.side : ''}</span>
+        <input class="num" type="number" inputmode="numeric" min="0" max="600"
+               data-ex-set="${escapeHtml(ex.key)}:${i}" placeholder="${r.reps}"
+               value="${draftOf(ex.key)[i] != null ? draftOf(ex.key)[i] : ''}">
+        <span class="unit">${unit}</span>
+      </div>`).join('')}
+    </div>
+    <div class="btn-row">
+      <button class="btn wide" data-ex-done="${escapeHtml(ex.key)}">記録</button>
     </div>
     <div class="btn-row sub-row">
       <a class="btn small" href="${ex.ref ? ytWatch(ex.ref) : ytSearch(ex.name + ' やり方')}" target="_blank" rel="noopener">お手本</a>
@@ -2144,6 +2182,14 @@ function renderMenu() {
 }
 
 function bindMenu() {
+  // セットごとの数は、入れたそばから覚える(画面を閉じても消えない)
+  document.addEventListener('input', ev => {
+    const t = ev.target.closest && ev.target.closest('[data-ex-set]');
+    if (!t) return;
+    const [key, idx] = t.dataset.exSet.split(':');
+    setDraft(key, Number(idx), t.value);
+  });
+
   document.addEventListener('click', ev => {
     const t = ev.target.closest('[data-min]');
     if (t) {
@@ -2201,11 +2247,15 @@ function bindMenu() {
     const d = ev.target.closest('[data-ex-done]');
     if (d) {
       const key = d.dataset.exDone;
-      const input = document.querySelector(`[data-ex-reps="${key}"]`);
-      const v = input && input.value !== '' ? Number(input.value) : rxOf(key).reps;
-      if (!Number.isFinite(v) || v < 0) { toast('回数を入れてください'); return; }
       if (doneExToday(key)) { toast('今日はもう記録しています'); return; }
-      recordEx(key, v);
+      const ex = exOf(key);
+      const a = draftOf(key);
+      // 入れたセットだけを記録する。空のままのセットは数えない
+      const sets = setSlots(ex)
+        .map((sl, i) => ({ set: sl.set, side: sl.side || null, v: Number(a[i]) }))
+        .filter(e => Number.isFinite(e.v) && e.v > 0);
+      if (!sets.length) { toast('できた数を入れてください'); return; }
+      recordEx(key, Math.min.apply(null, sets.map(e => e.v)), sets);
       renderMenu();
       render();
       toast('記録しました');

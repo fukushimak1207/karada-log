@@ -453,3 +453,9 @@ body.no-scroll { overflow: hidden; }
 .ex-cfg[hidden] { display: none; }
 .ex-cfg .field { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .ex-cfg .field label { min-width: 48px; color: var(--ink-sub); }
+
+/* ---- カードのセットごとの入力 ---- */
+.ex-sets { margin: 10px 0 8px; }
+.set-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.set-name { flex: 1; color: var(--ink-sub); }
+.set-row .num { width: 84px; }
