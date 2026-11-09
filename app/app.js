@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v39';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v40';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2250,15 +2250,11 @@ function bindMenu() {
       if (doneExToday(key)) { toast('今日はもう記録しています'); return; }
       const ex = exOf(key);
       const a = draftOf(key);
-      // 入れたセットだけを記録する。空のままのセットは数えない
-      const sets = setSlots(ex)
-        .map((sl, i) => ({ set: sl.set, side: sl.side || null, v: Number(a[i]) }))
-        .filter(e => Number.isFinite(e.v) && e.v > 0);
-      if (!sets.length) { toast('できた数を入れてください'); return; }
-      recordEx(key, Math.min.apply(null, sets.map(e => e.v)), sets);
-      renderMenu();
-      render();
-      toast('記録しました');
+      if (!setSlots(ex).some((sl, i) => Number(a[i]) > 0)) {
+        toast('できた数を入れてください');
+        return;
+      }
+      reviewEx(key);
       return;
     }
 
@@ -2351,6 +2347,21 @@ function keepAwake(on) {
 }
 
 /* key を渡せばその種目だけ、渡さなければメニューを頭から流す */
+/* カードの「記録」から、終わりの確認画面だけを開く。
+ * タイマーを通したときと同じ画面で、同じように直してから記録する。 */
+function reviewEx(key) {
+  const ex = exOf(key);
+  if (!ex) return;
+  const a = draftOf(key);
+  const got = {};
+  got[key] = setSlots(ex).map((sl, i) => ({
+    set: sl.set, side: sl.side || null, v: Math.max(0, Number(a[i]) || 0),
+  }));
+  run = { steps: [], i: 0, got: got, endAt: 0, tick: -1, waiting: true, ask: null, card: key };
+  $('#run').hidden = false;
+  renderRun({ kind: 'end' }, 0);
+}
+
 function startRun(key) {
   const min = TIME_CHOICES.includes(state.rxMin) ? state.rxMin : 15;
   const pick = key ? menuFor(min).items.filter(e => e.key === key) : menuFor(min).items;
@@ -2457,6 +2468,8 @@ function bumpEntry(key, idx, d) {
   if (!e) return;
   const ex = exOf(key);
   e.v = Math.max(0, e.v + d * (ex && ex.unit === 'sec' ? 5 : 1));
+  // カードから開いたときは、直した数を書きかけにも戻す(やめても消えないように)
+  if (run.card === key) setDraft(key, idx, e.v);
   renderAsk();
   // 一覧は作り直さず、その行の数字だけ書き換える(押すたびにボタンが入れ替わらないように)
   const cell = document.querySelector(`[data-run-val="${key}:${idx}"]`);
@@ -2520,9 +2533,9 @@ function endRun(keep) {
   let n = 0;
   Object.keys(got).forEach(key => {
     // 0 のセットは「飛ばした」とみなして数えない。記録すると負荷が下がってしまう
-    const vals = got[key].filter(e => e.v > 0).map(e => e.v);
-    if (doneExToday(key) || !vals.length) return;
-    recordEx(key, Math.min.apply(null, vals), got[key]);
+    const did = got[key].filter(e => e.v > 0);
+    if (doneExToday(key) || !did.length) return;
+    recordEx(key, Math.min.apply(null, did.map(e => e.v)), did);
     n += 1;
   });
   renderMenu();
