@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v34';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v35';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -240,6 +240,7 @@ const defaultState = () => ({
   rx: {},                                             // {種目キー: {load, reps, last, updated}} 処方
   measured: null,                                     // 実力を測った日。測っていなければ null
   rxMin: 15,                                          // メニューで最後に選んだ持ち時間(分)
+  rxBackup: null,                                     // 測り直す前の処方。{rx, measured}
 });
 
 let state = defaultState();
@@ -545,29 +546,39 @@ function setSpare(hasSpare) {
   save();
 }
 
+/* 記録を消すだけだと、上がった(下がった)目標が残ってしまう。控えまで戻す */
+function restoreRx(l) {
+  if (!l.ex || !state.rx || !state.rx[l.ex]) return;
+  if (l.prev) {
+    state.rx[l.ex] = { ...l.prev };
+  } else {
+    // 控えが無い古い記録。負荷だけは戻せる
+    const n = Number(l.level);
+    if (Number.isFinite(n)) state.rx[l.ex].load = n;
+    state.rx[l.ex].last = null;
+  }
+}
+
 function undoToday() {
   const d = todayStr();
   const before = state.logs.length;
-  const gone = state.logs.filter(l => l.d === d);
-
-  /* 記録を消すだけだと、上がった(下がった)目標が残ってしまう。
-   * 同じ種目が複数あれば、一番古いものの控えまで戻す。 */
-  gone.slice().reverse().forEach(l => {
-    if (!l.ex || !state.rx || !state.rx[l.ex]) return;
-    if (l.prev) {
-      state.rx[l.ex] = { ...l.prev };
-    } else {
-      // 控えが無い古い記録。負荷だけは戻せる
-      const n = Number(l.level);
-      if (Number.isFinite(n)) state.rx[l.ex].load = n;
-      state.rx[l.ex].last = null;
-    }
-  });
-
+  // 同じ種目が複数あれば、一番古いものの控えまで戻す
+  state.logs.filter(l => l.d === d).reverse().forEach(restoreRx);
   state.logs = state.logs.filter(l => l.d !== d);
   state.todayPick = null;
   save();
   return before - state.logs.length;
+}
+
+/* 押し間違えた1種目だけ取り消す */
+function undoEx(key) {
+  const d = todayStr();
+  const hit = state.logs.filter(l => l.d === d && l.ex === key);
+  if (!hit.length) return 0;
+  hit.slice().reverse().forEach(restoreRx);
+  state.logs = state.logs.filter(l => !(l.d === d && l.ex === key));
+  save();
+  return hit.length;
 }
 
 /* ---------- 集計 ---------- */
@@ -1986,6 +1997,7 @@ function measureFormHtml() {
     </div>
 
     <button id="btn-measure-save" class="btn primary wide">決める</button>
+    ${state.rxBackup ? '<div class="btn-row sub-row"><button id="btn-rx-restore" class="btn small">前の目標に戻す</button></div>' : ''}
   </div>`;
 }
 
@@ -2002,6 +2014,9 @@ function exCardHtml(ex) {
       <p class="vtitle">${escapeHtml(ex.name)}</p>
       <p class="ex-done">やりました　${done.done}${unit}</p>
       <p class="note">次は ${now.reps}${unit}／${escapeHtml(loadLabel(ex.key))}</p>
+      <div class="btn-row sub-row">
+        <button class="btn small" data-ex-undo="${escapeHtml(ex.key)}">取り消す</button>
+      </div>
     </div>`;
   }
 
@@ -2066,6 +2081,15 @@ function bindMenu() {
     const rn = ev.target.closest('[data-ex-run]');
     if (rn) { startRun(rn.dataset.exRun); return; }
 
+    const un = ev.target.closest('[data-ex-undo]');
+    if (un) {
+      if (!undoEx(un.dataset.exUndo)) { toast('今日の記録はありません'); return; }
+      renderMenu();
+      render();
+      toast('取り消しました');
+      return;
+    }
+
     const d = ev.target.closest('[data-ex-done]');
     if (d) {
       const key = d.dataset.exDone;
@@ -2095,6 +2119,8 @@ function bindMenu() {
         return;
       }
       applyMeasure(m);
+      state.rxBackup = null;
+      save();
       renderMenu();
       toast('メニューを作りました');
       return;
@@ -2102,10 +2128,24 @@ function bindMenu() {
 
     if (ev.target.closest('#btn-remeasure')) {
       if (!confirm('測り直します。いまの目標はすべて作り直されます。よろしいですか。')) return;
+      // 押し間違えても戻せるよう、消す前の処方を控える
+      state.rxBackup = { rx: state.rx, measured: state.measured };
       state.measured = null;
       state.rx = {};
       save();
       renderMenu();
+      return;
+    }
+
+    if (ev.target.closest('#btn-rx-restore')) {
+      const b = state.rxBackup;
+      if (!b) { toast('戻せる目標がありません'); return; }
+      state.rx = b.rx || {};
+      state.measured = b.measured || todayStr();
+      state.rxBackup = null;
+      save();
+      renderMenu();
+      toast('前の目標に戻しました');
     }
   });
 }
