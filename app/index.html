@@ -103,6 +103,10 @@
     <p id="run-sub"></p>
     <p id="run-num"></p>
     <p id="run-count"></p>
+    <div id="run-rest" class="btn-row" hidden>
+      <button id="run-rest-minus" class="btn small">−15秒</button>
+      <button id="run-rest-plus" class="btn small">＋15秒</button>
+    </div>
     <p id="run-next"></p>
     <div id="run-ask" hidden>
       <p id="run-ask-name"></p>
@@ -113,7 +117,10 @@
       </div>
     </div>
     <div class="btn-row">
+      <button id="run-pause" class="btn wide">一時停止</button>
       <button id="run-skip" class="btn wide">ここまで</button>
+    </div>
+    <div class="btn-row">
       <button id="run-stop" class="btn wide">やめる</button>
     </div>
   </div>
@@ -151,6 +158,19 @@
         <select id="sel-video"></select>
       </div>
       <button id="btn-apply-video" class="btn primary wide">今日の動画にする</button>
+    </section>
+
+    <section class="pad">
+      <h3>休みの長さ</h3>
+      <div class="field">
+        <label for="set-rest-set">セット間</label>
+        <input id="set-rest-set" class="num" type="number" inputmode="numeric" min="0" max="300"> 秒
+      </div>
+      <div class="field">
+        <label for="set-rest-ex">種目を変えるとき</label>
+        <input id="set-rest-ex" class="num" type="number" inputmode="numeric" min="0" max="300"> 秒
+      </div>
+      <button id="btn-rest-save" class="btn primary wide">決める</button>
     </section>
 
     <section class="pad">

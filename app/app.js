@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v36';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v37';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -241,6 +241,8 @@ const defaultState = () => ({
   measured: null,                                     // 実力を測った日。測っていなければ null
   rxMin: 15,                                          // メニューで最後に選んだ持ち時間(分)
   rxBackup: null,                                     // 測り直す前の処方。{rx, measured}
+  restSet: 60,                                        // セット間の休み(秒)
+  restEx: 90,                                         // 種目を変えるときの休み(秒)
 });
 
 let state = defaultState();
@@ -1013,6 +1015,10 @@ function renderSettings() {
       ? `前回の測定: ${state.measure.last}`
       : 'まだ測った記録がありません。';
   }
+  const rs = $('#set-rest-set');
+  if (rs) rs.value = String(restSec('set'));
+  const re = $('#set-rest-ex');
+  if (re) re.value = String(restSec('ex'));
   renderPartSelect();
   renderLevels();
   renderVideoList();
@@ -1565,6 +1571,20 @@ function bind() {
     render();
   });
 
+  // 休みの長さ
+  $('#btn-rest-save').addEventListener('click', () => {
+    const a = Number($('#set-rest-set').value);
+    const b = Number($('#set-rest-ex').value);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) {
+      toast('秒数を入れてください');
+      return;
+    }
+    state.restSet = Math.min(300, Math.round(a));
+    state.restEx = Math.min(300, Math.round(b));
+    save();
+    toast('休みの長さを変えました');
+  });
+
   // 今日の記録を消す
   $('#btn-undo-today').addEventListener('click', () => {
     const n = logsOf(todayStr()).length;
@@ -1908,6 +1928,19 @@ const LEAD_SEC = 5;    // 始まる前、構えるための時間(秒)
 
 /* メニューを、頭から順に再生するだけの手順に展開する。
  * 画面はこの配列を上から流すだけなので、進行の判断を1か所に閉じられる。 */
+/* 片脚・片腕でやる種目は、右と左を続けてやって1セット。
+ * サイドプランクは段階に関係なく左右、ほかは「片」の付く段階のときだけ。 */
+function sidesOf(ex) {
+  if (ex.key === 'splank') return ['右', '左'];
+  return /片/.test(loadLabel(ex.key)) ? ['右', '左'] : [null];
+}
+
+function restSec(which) {
+  const n = Number(which === 'ex' ? state.restEx : state.restSet);
+  if (Number.isFinite(n) && n >= 0) return n;
+  return which === 'ex' ? REST_EX : REST_SET;
+}
+
 function buildSession(items) {
   const steps = [];
   if (!items || !items.length) return steps;
@@ -1918,22 +1951,26 @@ function buildSession(items) {
     const r = rxOf(ex.key);
     const sec = ex.unit === 'sec';
     const last = i === items.length - 1;
+    const sides = sidesOf(ex);
 
     for (let set = 1; set <= SETS; set++) {
-      steps.push({
-        kind: 'work',
-        key: ex.key,
-        name: ex.name,
-        load: loadLabel(ex.key),
-        set: set,
-        unit: sec ? 'sec' : 'rep',
-        target: r.reps,                               // 秒なら秒数、回数なら回数
-        sec: sec ? r.reps : r.reps * TEMPO_SEC,       // この手順にかかる秒数
+      sides.forEach(side => {
+        steps.push({
+          kind: 'work',
+          key: ex.key,
+          name: ex.name,
+          load: loadLabel(ex.key),
+          set: set,
+          side: side,                                 // '右' '左'、左右のない種目は null
+          unit: sec ? 'sec' : 'rep',
+          target: r.reps,                             // 秒なら秒数、回数なら回数
+          sec: sec ? r.reps : r.reps * TEMPO_SEC,     // この手順にかかる秒数
+        });
       });
       if (last && set === SETS) break;
       steps.push({
         kind: 'rest',
-        sec: set === SETS ? REST_EX : REST_SET,
+        sec: set === SETS ? restSec('ex') : restSec('set'),
         next: set === SETS ? items[i + 1].name : ex.name,
       });
     }
@@ -2222,7 +2259,7 @@ function openStep() {
 
 /* 残り秒は時刻の差から出す。数え上げる作りだと、画面が消えた間にずれる */
 function runTick() {
-  if (!run || run.waiting) return;
+  if (!run || run.waiting || run.paused) return;
   const st = run.steps[run.i];
   const left = Math.ceil((run.endAt - Date.now()) / 1000);
 
@@ -2252,7 +2289,8 @@ function nextStep(early) {
     arr.push(doneFrom(st, passed));
     /* タイマーは鳴った数を数えているだけで、体が動いたかは見ていない。
      * 休んでいる間に、実際にできた数へ直せるようにする。 */
-    run.ask = { key: st.key, idx: arr.length - 1, name: st.name, set: st.set, unit: st.unit };
+    run.ask = { key: st.key, idx: arr.length - 1, name: st.name, set: st.set,
+                side: st.side, unit: st.unit };
   }
   run.i += 1;
   if (run.i >= run.steps.length) { waitLast(); return; }
@@ -2267,6 +2305,33 @@ function waitLast() {
   renderRun({ kind: 'end' }, 0);
 }
 
+/* 一時停止。残り時間を抱えておき、再開でその分だけ先に延ばす */
+function togglePause() {
+  if (!run || run.waiting) return;
+  if (run.paused) {
+    run.endAt = Date.now() + run.paused;
+    run.paused = 0;
+  } else {
+    run.paused = Math.max(0, run.endAt - Date.now());
+  }
+  run.tick = -1;
+  renderRun(run.steps[run.i], Math.ceil(runLeft() / 1000));
+}
+
+function runLeft() {
+  if (!run) return 0;
+  return run.paused ? run.paused : run.endAt - Date.now();
+}
+
+/* いまの休みだけ伸ばす・縮める。次のセットの休みは変えない */
+function bumpRest(d) {
+  if (!run || run.steps[run.i].kind !== 'rest') return;
+  if (run.paused) run.paused = Math.max(0, run.paused + d * 1000);
+  else run.endAt = Math.max(Date.now(), run.endAt + d * 1000);
+  run.tick = -1;
+  renderRun(run.steps[run.i], Math.ceil(runLeft() / 1000));
+}
+
 function bumpAsk(d) {
   const ask = run && run.ask;
   if (!ask) return;
@@ -2279,7 +2344,8 @@ function renderAsk() {
   const ask = run && run.ask;
   $('#run-ask').hidden = !ask;
   if (!ask) return;
-  $('#run-ask-name').textContent = ask.name + '　' + ask.set + 'セット目';
+  $('#run-ask-name').textContent = ask.name + '　' + ask.set + 'セット目'
+    + (ask.side ? '　' + ask.side : '');
   $('#run-ask-val').textContent = run.got[ask.key][ask.idx] + (ask.unit === 'sec' ? '秒' : '回');
 }
 
@@ -2316,7 +2382,7 @@ function renderRun(st, left) {
   const sec = Math.max(0, left);
   const end = st.kind === 'end';
   $('#run-name').textContent = end ? 'おつかれさま'
-    : st.kind === 'work' ? st.name
+    : st.kind === 'work' ? st.name + (st.side ? '　' + st.side : '')
     : st.kind === 'rest' ? '休み' : 'はじめます';
   $('#run-sub').textContent = st.kind === 'work'
     ? st.set + 'セット目　' + st.target + (st.unit === 'sec' ? '秒' : '回') + '　' + st.load
@@ -2327,6 +2393,9 @@ function renderRun(st, left) {
     : '';
   $('#run-next').textContent = !end && st.next ? '次は ' + st.next : '';
   $('#run-skip').textContent = run && run.waiting ? 'おわり' : 'ここまで';
+  $('#run-rest').hidden = st.kind !== 'rest';
+  $('#run-pause').hidden = end;
+  $('#run-pause').textContent = run && run.paused ? '再開' : '一時停止';
   renderAsk();
 }
 
@@ -2334,11 +2403,15 @@ function bindRun() {
   $('#run-skip').addEventListener('click', () => {
     if (!run) return;
     if (run.waiting) { finishRun(); return; }
+    if (run.paused) { run.endAt = Date.now() + run.paused; run.paused = 0; }
     nextStep(true);
   });
   $('#run-stop').addEventListener('click', () => { if (run) stopRun(); });
   $('#run-ask-minus').addEventListener('click', () => bumpAsk(-1));
   $('#run-ask-plus').addEventListener('click', () => bumpAsk(1));
+  $('#run-pause').addEventListener('click', togglePause);
+  $('#run-rest-minus').addEventListener('click', () => bumpRest(-15));
+  $('#run-rest-plus').addEventListener('click', () => bumpRest(15));
 }
 
 /* ---------- 起動 ---------- */
