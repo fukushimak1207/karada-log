@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v41';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v42';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -242,8 +242,8 @@ const defaultState = () => ({
   rxMin: 15,                                          // メニューで最後に選んだ持ち時間(分)
   rxBackup: null,                                     // 測り直す前の処方。{rx, measured}
   draft: null,                                        // {d, ex:{種目キー:[セットごとの数]}} 書きかけ
-  restSet: 60,                                        // セット間の休み(秒)
-  restEx: 90,                                         // 種目を変えるときの休み(秒)
+  restSet: 30,                                        // セット間の休み(秒)。REST_SET と同じ値
+  restEx: 30,                                         // 種目を変えるときの休み(秒)。REST_EX と同じ値
 });
 
 let state = defaultState();
@@ -1580,8 +1580,9 @@ function bind() {
       toast('秒数を入れてください');
       return;
     }
-    state.restSet = Math.min(300, Math.round(a));
-    state.restEx = Math.min(300, Math.round(b));
+    if (a > REST_MAX || b > REST_MAX) { toast('休みは' + REST_MAX + '秒まで'); return; }
+    state.restSet = Math.min(REST_MAX, Math.round(a));
+    state.restEx = Math.min(REST_MAX, Math.round(b));
     save();
     toast('休みの長さを変えました');
   });
@@ -1928,8 +1929,10 @@ function doneExToday(key) {
 /* ---------- 一連の実行(タイマー) ---------- */
 
 const TEMPO_SEC = 3;   // 回数の種目。1回にかける秒数(下ろす2秒・上げる1秒)
-const REST_SET = 60;   // セット間の休み(秒)
-const REST_EX = 90;    // 種目を変えるときの休み(秒)
+const REST_SET = 30;   // セット間の休み(秒)
+const REST_EX = 30;    // 種目を変えるときの休み(秒)
+const REST_MAX = 30;   // 休みはここまで。これより長くは取らない
+const REST_SIDE = 5;   // 右と左を入れ替える間(秒)
 const LEAD_SEC = 5;    // 始まる前、構えるための時間(秒)
 
 /* メニューを、頭から順に再生するだけの手順に展開する。
@@ -1949,12 +1952,13 @@ function setsOf(key) {
 
 function restOf(key) {
   const n = Number((rxOf(key) || {}).rest);
-  return Number.isFinite(n) && n >= 0 && n <= 300 ? Math.round(n) : restSec('set');
+  if (!Number.isFinite(n) || n < 0) return restSec('set');
+  return Math.min(REST_MAX, Math.round(n));
 }
 
 function restSec(which) {
   const n = Number(which === 'ex' ? state.restEx : state.restSet);
-  if (Number.isFinite(n) && n >= 0) return n;
+  if (Number.isFinite(n) && n >= 0) return Math.min(REST_MAX, Math.round(n));
   return which === 'ex' ? REST_EX : REST_SET;
 }
 
@@ -2001,7 +2005,7 @@ function buildSession(items) {
     const nSets = setsOf(ex.key);
 
     for (let set = 1; set <= nSets; set++) {
-      sides.forEach(side => {
+      sides.forEach((side, si) => {
         steps.push({
           kind: 'work',
           key: ex.key,
@@ -2013,6 +2017,10 @@ function buildSession(items) {
           target: r.reps,                             // 秒なら秒数、回数なら回数
           sec: sec ? r.reps : r.reps * TEMPO_SEC,     // この手順にかかる秒数
         });
+        // 右から左へ移る間。持ち替え・組み替えのぶんだけ空ける
+        if (si < sides.length - 1) {
+          steps.push({ kind: 'rest', sec: REST_SIDE, next: ex.name + '　' + sides[si + 1] });
+        }
       });
       if (last && set === nSets) break;
       steps.push({
@@ -2117,16 +2125,6 @@ function exCardHtml(ex) {
     <div class="btn-row">
       <button class="btn primary wide" data-ex-run="${escapeHtml(ex.key)}">はじめる</button>
     </div>
-    <div class="ex-sets">
-      ${setSlots(ex).map((sl, i) => `
-      <div class="set-row">
-        <span class="set-name">${sl.set}セット目${sl.side ? '　' + sl.side : ''}</span>
-        <input class="num" type="number" inputmode="numeric" min="0" max="600"
-               data-ex-set="${escapeHtml(ex.key)}:${i}" placeholder="${r.reps}"
-               value="${draftOf(ex.key)[i] != null ? draftOf(ex.key)[i] : ''}">
-        <span class="unit">${unit}</span>
-      </div>`).join('')}
-    </div>
     <div class="btn-row">
       <button class="btn wide" data-ex-done="${escapeHtml(ex.key)}">記録</button>
     </div>
@@ -2147,7 +2145,7 @@ function exCardHtml(ex) {
       </div>
       <div class="field">
         <label>休み</label>
-        <input class="num" type="number" inputmode="numeric" min="0" max="300"
+        <input class="num" type="number" inputmode="numeric" min="0" max="30"
                data-cfg-rest="${escapeHtml(ex.key)}" value="${restOf(ex.key)}"> 秒
       </div>
       <button class="btn wide" data-cfg-save="${escapeHtml(ex.key)}">決める</button>
@@ -2182,14 +2180,6 @@ function renderMenu() {
 }
 
 function bindMenu() {
-  // セットごとの数は、入れたそばから覚える(画面を閉じても消えない)
-  document.addEventListener('input', ev => {
-    const t = ev.target.closest && ev.target.closest('[data-ex-set]');
-    if (!t) return;
-    const [key, idx] = t.dataset.exSet.split(':');
-    setDraft(key, Number(idx), t.value);
-  });
-
   document.addEventListener('click', ev => {
     const t = ev.target.closest('[data-min]');
     if (t) {
@@ -2223,10 +2213,11 @@ function bindMenu() {
         toast('3つとも入れてください');
         return;
       }
+      if (rest > REST_MAX) { toast('休みは' + REST_MAX + '秒まで'); return; }
       const r = { ...rxOf(key) };
       r.reps = Math.min(ex && ex.unit === 'sec' ? 600 : 100, Math.round(reps));
       r.sets = Math.min(10, Math.round(sets));
-      r.rest = Math.min(300, Math.round(rest));
+      r.rest = Math.min(REST_MAX, Math.round(rest));
       if (!state.rx || typeof state.rx !== 'object') state.rx = {};
       state.rx[key] = r;
       save();
