@@ -437,3 +437,19 @@ body.no-scroll { overflow: hidden; }
 .ask-row .btn { min-width: 64px; font-size: 1.4rem; }
 #run-ask-val { min-width: 90px; font-size: 1.8rem; font-weight: 700;
                font-variant-numeric: tabular-nums; }
+
+/* ---- 終わりの一覧 ---- */
+#run { overflow-y: auto; }
+#run-list { width: 100%; max-width: 420px; margin: 4px 0 12px; }
+#run-list[hidden] { display: none; }
+.run-row-head { margin: 10px 0 4px; font-weight: 700; }
+.run-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.run-row .btn { flex: 0 0 auto; min-width: 52px; padding: 8px 0; }
+.run-row-name { flex: 1; text-align: left; color: var(--ink-sub); }
+.run-row-val { min-width: 64px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---- カードの詳細設定 ---- */
+.ex-cfg { margin-top: 10px; }
+.ex-cfg[hidden] { display: none; }
+.ex-cfg .field { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.ex-cfg .field label { min-width: 48px; color: var(--ink-sub); }

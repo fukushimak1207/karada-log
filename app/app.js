@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v37';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v38';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -1900,13 +1900,17 @@ function menuFor(minutes) {
 
 /* メニューでやった分の記録。動画の記録(logs)と同じ箱に入れる。
  * 動画の記録と区別できるよう ex(種目キー)を持たせる。 */
-function recordEx(key, done) {
+function recordEx(key, done, sets) {
   const ex = exOf(key);
   if (!ex) return;
   const before = rxOf(key);
   state.logs.push({
     d: todayStr(), id: 'ex:' + key, ex: key, part: ex.part,
     level: String(before.load), spare: null, slot: 1, done: Number(done),
+    // 何セット目の、どちら側で、いくつできたか
+    sets: Array.isArray(sets)
+      ? sets.map(e => ({ set: e.set, side: e.side || null, v: Number(e.v) }))
+      : null,
     // 消したときに戻せるよう、押す前の処方を控えておく
     prev: { load: before.load, reps: before.reps, last: before.last, updated: before.updated },
   });
@@ -1935,6 +1939,17 @@ function sidesOf(ex) {
   return /片/.test(loadLabel(ex.key)) ? ['右', '左'] : [null];
 }
 
+/* セット数と休みは種目ごとに決められる。決めていなければ全体の既定を使う */
+function setsOf(key) {
+  const n = Number((rxOf(key) || {}).sets);
+  return Number.isFinite(n) && n >= 1 && n <= 10 ? Math.round(n) : SETS;
+}
+
+function restOf(key) {
+  const n = Number((rxOf(key) || {}).rest);
+  return Number.isFinite(n) && n >= 0 && n <= 300 ? Math.round(n) : restSec('set');
+}
+
 function restSec(which) {
   const n = Number(which === 'ex' ? state.restEx : state.restSet);
   if (Number.isFinite(n) && n >= 0) return n;
@@ -1952,8 +1967,9 @@ function buildSession(items) {
     const sec = ex.unit === 'sec';
     const last = i === items.length - 1;
     const sides = sidesOf(ex);
+    const nSets = setsOf(ex.key);
 
-    for (let set = 1; set <= SETS; set++) {
+    for (let set = 1; set <= nSets; set++) {
       sides.forEach(side => {
         steps.push({
           kind: 'work',
@@ -1967,11 +1983,11 @@ function buildSession(items) {
           sec: sec ? r.reps : r.reps * TEMPO_SEC,     // この手順にかかる秒数
         });
       });
-      if (last && set === SETS) break;
+      if (last && set === nSets) break;
       steps.push({
         kind: 'rest',
-        sec: set === SETS ? restSec('ex') : restSec('set'),
-        next: set === SETS ? items[i + 1].name : ex.name,
+        sec: set === nSets ? restSec('ex') : restOf(ex.key),
+        next: set === nSets ? items[i + 1].name : ex.name,
       });
     }
   });
@@ -2050,6 +2066,9 @@ function exCardHtml(ex) {
     <div class="card ex-card done">
       <p class="vtitle">${escapeHtml(ex.name)}</p>
       <p class="ex-done">やりました　${done.done}${unit}</p>
+      ${done.sets && done.sets.length
+        ? `<p class="note">${done.sets.map(e => e.set + (e.side || '') + '　' + e.v + unit).join('／')}</p>`
+        : ''}
       <p class="note">次は ${now.reps}${unit}／${escapeHtml(loadLabel(ex.key))}</p>
       <div class="btn-row sub-row">
         <button class="btn small" data-ex-undo="${escapeHtml(ex.key)}">取り消す</button>
@@ -2060,7 +2079,7 @@ function exCardHtml(ex) {
   return `
   <div class="card ex-card">
     <p class="vtitle">${escapeHtml(ex.name)}</p>
-    <p class="ex-target"><strong>${r.reps}${unit}</strong> × ${SETS}セット</p>
+    <p class="ex-target"><strong>${r.reps}${unit}</strong> × ${setsOf(ex.key)}セット</p>
     <p class="ex-load">${escapeHtml(loadLabel(ex.key))}</p>
     <p class="note">${escapeHtml(ex.how)}</p>
     ${r.last ? `<p class="note">前回 ${r.last}${unit}</p>` : ''}
@@ -2075,6 +2094,25 @@ function exCardHtml(ex) {
     </div>
     <div class="btn-row sub-row">
       <a class="btn small" href="${ex.ref ? ytWatch(ex.ref) : ytSearch(ex.name + ' やり方')}" target="_blank" rel="noopener">お手本</a>
+      <button class="btn small" data-ex-cfg="${escapeHtml(ex.key)}">設定</button>
+    </div>
+    <div class="ex-cfg" data-cfg-for="${escapeHtml(ex.key)}" hidden>
+      <div class="field">
+        <label>目標</label>
+        <input class="num" type="number" inputmode="numeric" min="1" max="600"
+               data-cfg-reps="${escapeHtml(ex.key)}" value="${r.reps}"> ${unit}
+      </div>
+      <div class="field">
+        <label>セット</label>
+        <input class="num" type="number" inputmode="numeric" min="1" max="10"
+               data-cfg-sets="${escapeHtml(ex.key)}" value="${setsOf(ex.key)}">
+      </div>
+      <div class="field">
+        <label>休み</label>
+        <input class="num" type="number" inputmode="numeric" min="0" max="300"
+               data-cfg-rest="${escapeHtml(ex.key)}" value="${restOf(ex.key)}"> 秒
+      </div>
+      <button class="btn wide" data-cfg-save="${escapeHtml(ex.key)}">決める</button>
     </div>
   </div>`;
 }
@@ -2119,6 +2157,37 @@ function bindMenu() {
 
     const rn = ev.target.closest('[data-ex-run]');
     if (rn) { startRun(rn.dataset.exRun); return; }
+
+    const cf = ev.target.closest('[data-ex-cfg]');
+    if (cf) {
+      const box = document.querySelector(`[data-cfg-for="${cf.dataset.exCfg}"]`);
+      if (box) box.hidden = !box.hidden;
+      return;
+    }
+
+    const cs = ev.target.closest('[data-cfg-save]');
+    if (cs) {
+      const key = cs.dataset.cfgSave;
+      const ex = exOf(key);
+      const num = sel => Number((document.querySelector(sel) || {}).value);
+      const reps = num(`[data-cfg-reps="${key}"]`);
+      const sets = num(`[data-cfg-sets="${key}"]`);
+      const rest = num(`[data-cfg-rest="${key}"]`);
+      if (![reps, sets, rest].every(Number.isFinite) || reps < 1 || sets < 1 || rest < 0) {
+        toast('3つとも入れてください');
+        return;
+      }
+      const r = { ...rxOf(key) };
+      r.reps = Math.min(ex && ex.unit === 'sec' ? 600 : 100, Math.round(reps));
+      r.sets = Math.min(10, Math.round(sets));
+      r.rest = Math.min(300, Math.round(rest));
+      if (!state.rx || typeof state.rx !== 'object') state.rx = {};
+      state.rx[key] = r;
+      save();
+      renderMenu();
+      toast('決めました');
+      return;
+    }
 
     const un = ev.target.closest('[data-ex-undo]');
     if (un) {
@@ -2286,11 +2355,11 @@ function nextStep(early) {
   if (st.kind === 'work') {
     const passed = early ? st.sec - Math.max(0, Math.ceil((run.endAt - Date.now()) / 1000)) : st.sec;
     const arr = (run.got[st.key] = run.got[st.key] || []);
-    arr.push(doneFrom(st, passed));
+    // 何セット目の、どちら側で、いくつできたかを1件ずつ残す
+    arr.push({ set: st.set, side: st.side || null, v: doneFrom(st, passed) });
     /* タイマーは鳴った数を数えているだけで、体が動いたかは見ていない。
      * 休んでいる間に、実際にできた数へ直せるようにする。 */
-    run.ask = { key: st.key, idx: arr.length - 1, name: st.name, set: st.set,
-                side: st.side, unit: st.unit };
+    run.ask = { key: st.key, idx: arr.length - 1, name: st.name, unit: st.unit };
   }
   run.i += 1;
   if (run.i >= run.steps.length) { waitLast(); return; }
@@ -2300,6 +2369,7 @@ function nextStep(early) {
 /* 最後のセットには休みが無いので、数を直す間を置いてから終える */
 function waitLast() {
   run.waiting = true;
+  run.ask = null;             // 終わりは一覧で直す
   clearInterval(runTimer);
   runTimer = null;
   renderRun({ kind: 'end' }, 0);
@@ -2332,21 +2402,53 @@ function bumpRest(d) {
   renderRun(run.steps[run.i], Math.ceil(runLeft() / 1000));
 }
 
-function bumpAsk(d) {
-  const ask = run && run.ask;
-  if (!ask) return;
-  const step = ask.unit === 'sec' ? 5 : 1;
-  run.got[ask.key][ask.idx] = Math.max(0, run.got[ask.key][ask.idx] + d * step);
+function bumpEntry(key, idx, d) {
+  const e = run && run.got[key] && run.got[key][idx];
+  if (!e) return;
+  const ex = exOf(key);
+  e.v = Math.max(0, e.v + d * (ex && ex.unit === 'sec' ? 5 : 1));
   renderAsk();
+  // 一覧は作り直さず、その行の数字だけ書き換える(押すたびにボタンが入れ替わらないように)
+  const cell = document.querySelector(`[data-run-val="${key}:${idx}"]`);
+  if (cell) cell.textContent = e.v + (ex && ex.unit === 'sec' ? '秒' : '回');
+  else renderList();
+}
+
+function bumpAsk(d) {
+  if (run && run.ask) bumpEntry(run.ask.key, run.ask.idx, d);
+}
+
+function entryLabel(e) {
+  return e.set + 'セット目' + (e.side ? '　' + e.side : '');
 }
 
 function renderAsk() {
   const ask = run && run.ask;
   $('#run-ask').hidden = !ask;
   if (!ask) return;
-  $('#run-ask-name').textContent = ask.name + '　' + ask.set + 'セット目'
-    + (ask.side ? '　' + ask.side : '');
-  $('#run-ask-val').textContent = run.got[ask.key][ask.idx] + (ask.unit === 'sec' ? '秒' : '回');
+  const e = run.got[ask.key][ask.idx];
+  $('#run-ask-name').textContent = ask.name + '　' + entryLabel(e);
+  $('#run-ask-val').textContent = e.v + (ask.unit === 'sec' ? '秒' : '回');
+}
+
+/* 終わりに、全セットを並べて直せるようにする */
+function renderList() {
+  const el = $('#run-list');
+  if (!el) return;
+  if (!run || !run.waiting) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = Object.keys(run.got).map(key => {
+    const ex = exOf(key);
+    const unit = ex && ex.unit === 'sec' ? '秒' : '回';
+    const rows = run.got[key].map((e, i) => `
+      <div class="run-row">
+        <span class="run-row-name">${escapeHtml(entryLabel(e))}</span>
+        <button class="btn small" data-run-bump="${escapeHtml(key)}:${i}:-1">−</button>
+        <span class="run-row-val" data-run-val="${escapeHtml(key)}:${i}">${e.v}${unit}</span>
+        <button class="btn small" data-run-bump="${escapeHtml(key)}:${i}:1">＋</button>
+      </div>`).join('');
+    return `<p class="run-row-head">${escapeHtml(ex ? ex.name : key)}</p>${rows}`;
+  }).join('');
 }
 
 function finishRun() { endRun(true); }
@@ -2368,9 +2470,9 @@ function endRun(keep) {
   let n = 0;
   Object.keys(got).forEach(key => {
     // 0 のセットは「飛ばした」とみなして数えない。記録すると負荷が下がってしまう
-    const vals = got[key].filter(v => v > 0);
+    const vals = got[key].filter(e => e.v > 0).map(e => e.v);
     if (doneExToday(key) || !vals.length) return;
-    recordEx(key, Math.min.apply(null, vals));
+    recordEx(key, Math.min.apply(null, vals), got[key]);
     n += 1;
   });
   renderMenu();
@@ -2397,6 +2499,7 @@ function renderRun(st, left) {
   $('#run-pause').hidden = end;
   $('#run-pause').textContent = run && run.paused ? '再開' : '一時停止';
   renderAsk();
+  renderList();
 }
 
 function bindRun() {
@@ -2410,6 +2513,12 @@ function bindRun() {
   $('#run-ask-minus').addEventListener('click', () => bumpAsk(-1));
   $('#run-ask-plus').addEventListener('click', () => bumpAsk(1));
   $('#run-pause').addEventListener('click', togglePause);
+  $('#run-list').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-run-bump]');
+    if (!b) return;
+    const [key, idx, d] = b.dataset.runBump.split(':');
+    bumpEntry(key, Number(idx), Number(d));
+  });
   $('#run-rest-minus').addEventListener('click', () => bumpRest(-15));
   $('#run-rest-plus').addEventListener('click', () => bumpRest(15));
 }
