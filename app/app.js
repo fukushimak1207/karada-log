@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v35';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v36';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2027,14 +2027,16 @@ function exCardHtml(ex) {
     <p class="ex-load">${escapeHtml(loadLabel(ex.key))}</p>
     <p class="note">${escapeHtml(ex.how)}</p>
     ${r.last ? `<p class="note">前回 ${r.last}${unit}</p>` : ''}
+    <div class="btn-row">
+      <button class="btn primary wide" data-ex-run="${escapeHtml(ex.key)}">はじめる</button>
+    </div>
     <div class="ex-input">
       <input class="num" type="number" inputmode="numeric" min="0" max="600"
              data-ex-reps="${escapeHtml(ex.key)}" placeholder="${r.reps}">
       <span class="unit">${unit}</span>
-      <button class="btn primary" data-ex-done="${escapeHtml(ex.key)}">記録</button>
+      <button class="btn" data-ex-done="${escapeHtml(ex.key)}">記録</button>
     </div>
     <div class="btn-row sub-row">
-      <button class="btn small" data-ex-run="${escapeHtml(ex.key)}">はじめる</button>
       <a class="btn small" href="${ex.ref ? ytWatch(ex.ref) : ytSearch(ex.name + ' やり方')}" target="_blank" rel="noopener">お手本</a>
     </div>
   </div>`;
