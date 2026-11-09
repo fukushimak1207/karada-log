@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v40';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v41';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2248,12 +2248,6 @@ function bindMenu() {
     if (d) {
       const key = d.dataset.exDone;
       if (doneExToday(key)) { toast('今日はもう記録しています'); return; }
-      const ex = exOf(key);
-      const a = draftOf(key);
-      if (!setSlots(ex).some((sl, i) => Number(a[i]) > 0)) {
-        toast('できた数を入れてください');
-        return;
-      }
       reviewEx(key);
       return;
     }
@@ -2353,9 +2347,12 @@ function reviewEx(key) {
   const ex = exOf(key);
   if (!ex) return;
   const a = draftOf(key);
+  const r = rxOf(key);
   const got = {};
+  // 入れていないセットは目標の数で出す(タイマーを通したときと同じ出かた)
   got[key] = setSlots(ex).map((sl, i) => ({
-    set: sl.set, side: sl.side || null, v: Math.max(0, Number(a[i]) || 0),
+    set: sl.set, side: sl.side || null,
+    v: Number(a[i]) > 0 ? Math.round(Number(a[i])) : r.reps,
   }));
   run = { steps: [], i: 0, got: got, endAt: 0, tick: -1, waiting: true, ask: null, card: key };
   $('#run').hidden = false;
