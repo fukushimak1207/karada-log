@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v42';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v43';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -1962,6 +1962,12 @@ function restSec(which) {
   return which === 'ex' ? REST_EX : REST_SET;
 }
 
+/* 1回にかける秒数。「上で3秒止める」のような段階は、その秒数を足す */
+function tempoOf(key) {
+  const m = /(\d+)秒止める/.exec(loadLabel(key) || '');
+  return TEMPO_SEC + (m ? Number(m[1]) : 0);
+}
+
 /* 何セット目のどちら側か、を順番に並べる。画面も手順もこれを元にする */
 function setSlots(ex) {
   const sides = sidesOf(ex);
@@ -2003,6 +2009,7 @@ function buildSession(items) {
     const last = i === items.length - 1;
     const sides = sidesOf(ex);
     const nSets = setsOf(ex.key);
+    const tempo = tempoOf(ex.key);
 
     for (let set = 1; set <= nSets; set++) {
       sides.forEach((side, si) => {
@@ -2015,7 +2022,8 @@ function buildSession(items) {
           side: side,                                 // '右' '左'、左右のない種目は null
           unit: sec ? 'sec' : 'rep',
           target: r.reps,                             // 秒なら秒数、回数なら回数
-          sec: sec ? r.reps : r.reps * TEMPO_SEC,     // この手順にかかる秒数
+          tempo: tempo,                               // 1回にかける秒数
+          sec: sec ? r.reps : r.reps * tempo,         // この手順にかかる秒数
         });
         // 右から左へ移る間。持ち替え・組み替えのぶんだけ空ける
         if (si < sides.length - 1) {
@@ -2037,7 +2045,7 @@ function buildSession(items) {
 function doneFrom(step, elapsed) {
   const e = Math.max(0, Math.floor(elapsed));
   if (step.unit === 'sec') return Math.min(step.target, e);
-  return Math.min(step.target, Math.floor(e / TEMPO_SEC));
+  return Math.min(step.target, Math.floor(e / (step.tempo || TEMPO_SEC)));
 }
 
 /* ---------- メニューの画面 ---------- */
@@ -2395,7 +2403,7 @@ function onSecond(st, left) {
   // 回数の種目は、1回ぶんの間隔で鳴らす。その音に合わせて動く
   if (st.kind === 'work' && st.unit === 'rep') {
     const passed = st.sec - left;
-    if (passed > 0 && passed % TEMPO_SEC === 0) beep(660, 70);
+    if (passed > 0 && passed % (st.tempo || TEMPO_SEC) === 0) beep(660, 70);
   }
 }
 
