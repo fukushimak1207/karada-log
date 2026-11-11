@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v43';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v44';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -242,6 +242,7 @@ const defaultState = () => ({
   rxMin: 15,                                          // メニューで最後に選んだ持ち時間(分)
   rxBackup: null,                                     // 測り直す前の処方。{rx, measured}
   draft: null,                                        // {d, ex:{種目キー:[セットごとの数]}} 書きかけ
+  vol: 100,                                           // 音の大きさ(0〜100)
   restSet: 30,                                        // セット間の休み(秒)。REST_SET と同じ値
   restEx: 30,                                         // 種目を変えるときの休み(秒)。REST_EX と同じ値
 });
@@ -1016,6 +1017,8 @@ function renderSettings() {
       ? `前回の測定: ${state.measure.last}`
       : 'まだ測った記録がありません。';
   }
+  const sv = $('#set-vol');
+  if (sv) { sv.value = String(volOf()); $('#set-vol-num').textContent = volOf() + '%'; }
   const rs = $('#set-rest-set');
   if (rs) rs.value = String(restSec('set'));
   const re = $('#set-rest-ex');
@@ -1570,6 +1573,15 @@ function bind() {
     toast('今日の動画を変えました');
     $('#settings').hidden = true;
     render();
+  });
+
+  // 音の大きさ。動かすたびに覚えて、その場で鳴らして確かめられる
+  $('#set-vol').addEventListener('input', ev => {
+    state.vol = Math.max(0, Math.min(100, Math.round(Number(ev.target.value) || 0)));
+    $('#set-vol-num').textContent = state.vol + '%';
+    save();
+    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    beep(880, 90);
   });
 
   // 休みの長さ
@@ -2305,9 +2317,16 @@ let runTimer = null;
 let audioCtx = null;
 let wakeLock = null;
 
+/* 音の大きさ。0 なら鳴らさない */
+function volOf() {
+  const n = Number(state.vol);
+  if (!Number.isFinite(n) || n < 0) return 100;
+  return Math.min(100, Math.round(n));
+}
+
 /* 音は端末に持たせる。ファイルを置くとオフラインで鳴らないことがある */
 function beep(freq, ms) {
-  if (!audioCtx) return;
+  if (!audioCtx || !volOf()) return;
   try {
     const t = audioCtx.currentTime;
     const o = audioCtx.createOscillator();
@@ -2316,7 +2335,7 @@ function beep(freq, ms) {
     o.connect(g);
     g.connect(audioCtx.destination);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.25 * volOf() / 100, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
     o.start(t);
     o.stop(t + ms / 1000 + 0.02);

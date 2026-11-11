@@ -426,7 +426,8 @@ body.no-scroll { overflow: hidden; }
 #run-sub { margin: 0; color: var(--ink-sub); }
 #run-num { margin: 8px 0; font-size: 5.5rem; font-weight: 700; line-height: 1;
            font-variant-numeric: tabular-nums; color: var(--accent); }
-#run-count { margin: 0; font-size: 1.5rem; font-weight: 700; }
+#run-count { margin: 0; font-size: 2.6rem; font-weight: 700; line-height: 1.1;
+             font-variant-numeric: tabular-nums; }
 #run-next { margin: 8px 0 20px; color: var(--ink-sub); }
 #run .btn-row { width: 100%; max-width: 420px; }
 
@@ -459,3 +460,7 @@ body.no-scroll { overflow: hidden; }
 .set-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .set-name { flex: 1; color: var(--ink-sub); }
 .set-row .num { width: 84px; }
+
+/* ---- 音の大きさ ---- */
+#set-vol { flex: 1; }
+#set-vol-num { min-width: 48px; text-align: right; color: var(--ink-sub); }
