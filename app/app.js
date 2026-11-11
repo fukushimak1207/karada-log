@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v44';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v45';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2149,7 +2149,7 @@ function exCardHtml(ex) {
       <button class="btn wide" data-ex-done="${escapeHtml(ex.key)}">記録</button>
     </div>
     <div class="btn-row sub-row">
-      <a class="btn small" href="${ex.ref ? ytWatch(ex.ref) : ytSearch(ex.name + ' やり方')}" target="_blank" rel="noopener">お手本</a>
+      <button class="btn small" data-ex-demo="${escapeHtml(ex.key)}">お手本</button>
       <button class="btn small" data-ex-cfg="${escapeHtml(ex.key)}">設定</button>
     </div>
     <div class="ex-cfg" data-cfg-for="${escapeHtml(ex.key)}" hidden>
@@ -2601,6 +2601,62 @@ function bindRun() {
   $('#run-rest-plus').addEventListener('click', () => bumpRest(15));
 }
 
+/* ---------- お手本アニメ ---------- */
+
+let demo = null;
+
+function videoUrl(ex) {
+  return ex.ref ? ytWatch(ex.ref) : ytSearch(ex.name + ' やり方');
+}
+
+/* 今の段階の動きを出す。アニメが読めなければ(古いキャッシュなど)動画を開く */
+function openDemo(key) {
+  const ex = exOf(key);
+  if (!ex) return;
+  const def = window.Anime ? window.Anime.make(key, clampLoad(ex, rxOf(key).load)) : null;
+  if (!def) { window.open(videoUrl(ex), '_blank', 'noopener'); return; }
+  closeDemo();
+  $('#demo-name').textContent = ex.name;
+  $('#demo-load').textContent = loadLabel(key);
+  $('#demo-video').href = videoUrl(ex);
+  $('#demo-pts').innerHTML = def.cues.map(c => `<li>${escapeHtml(c.text)}</li>`).join('');
+  $('#demo-slow').setAttribute('aria-pressed', 'false');
+  $('#demo').hidden = false;
+  const items = Array.from($('#demo-pts').children);
+  demo = new window.Anime.Player($('#demo-cv'), def, f => {
+    if ($('#demo-phase').textContent !== f.label) $('#demo-phase').textContent = f.label;
+    items.forEach((li, i) => {
+      const on = f.on.indexOf(i) >= 0;
+      if (li.classList.contains('on') !== on) li.classList.toggle('on', on);
+    });
+  });
+  $('#demo-play').textContent = demo.playing ? '止める' : '動かす';
+}
+
+function closeDemo() {
+  if (demo) demo.stop();
+  demo = null;
+  $('#demo').hidden = true;
+}
+
+function bindDemo() {
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-ex-demo]');
+    if (b) openDemo(b.dataset.exDemo);
+  });
+  $('#demo-close').addEventListener('click', closeDemo);
+  $('#demo-play').addEventListener('click', () => {
+    if (!demo) return;
+    demo.playing = !demo.playing;
+    $('#demo-play').textContent = demo.playing ? '止める' : '動かす';
+  });
+  $('#demo-slow').addEventListener('click', () => {
+    if (!demo) return;
+    demo.speed = demo.speed === 1 ? 0.5 : 1;
+    $('#demo-slow').setAttribute('aria-pressed', String(demo.speed !== 1));
+  });
+}
+
 /* ---------- 起動 ---------- */
 
 load();
@@ -2609,6 +2665,7 @@ applyLinkPick();
 bind();
 bindMenu();
 bindRun();
+bindDemo();
 watchFullscreen();
 render();
 showTab('menu');   // 開いたらメニューから

@@ -126,6 +126,25 @@
     </div>
   </div>
 
+  <!-- お手本アニメ。棒人間で動きとポイントを見せる -->
+  <div id="demo" hidden>
+    <div class="demo-head">
+      <p id="demo-name"></p>
+      <button id="demo-close" class="btn small">閉じる</button>
+    </div>
+    <p id="demo-load"></p>
+    <canvas id="demo-cv"></canvas>
+    <div class="demo-row">
+      <span id="demo-phase"></span>
+      <span class="demo-btns">
+        <button id="demo-slow" class="btn small" aria-pressed="false">ゆっくり</button>
+        <button id="demo-play" class="btn small">止める</button>
+      </span>
+    </div>
+    <ul id="demo-pts"></ul>
+    <a id="demo-video" class="btn small" target="_blank" rel="noopener">動画</a>
+  </div>
+
   <!-- ストレッチ(記録はしない。やりたいものを選んで再生するだけ) -->
   <div id="tab-stretch" hidden>
     <div id="stretch-list"></div>
@@ -306,6 +325,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
+<script src="anime.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

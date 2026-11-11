@@ -464,3 +464,22 @@ body.no-scroll { overflow: hidden; }
 /* ---- 音の大きさ ---- */
 #set-vol { flex: 1; }
 #set-vol-num { min-width: 48px; text-align: right; color: var(--ink-sub); }
+
+/* ---- お手本アニメ ---- */
+#demo { position: fixed; inset: 0; z-index: 50; overflow-y: auto; background: var(--bg);
+        padding: max(16px, env(safe-area-inset-top)) 16px 32px; }
+#demo > * { max-width: 460px; margin-left: auto; margin-right: auto; }
+.demo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#demo-name { margin: 0; font-size: 1.3rem; font-weight: 700; }
+#demo-load { margin: 0 auto 8px; color: var(--ink-sub); }
+#demo-cv { display: block; width: 100%; aspect-ratio: 320 / 232; background: var(--card);
+           border: 1px solid var(--line); border-radius: var(--radius); }
+.demo-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+#demo-phase { font-size: 1.6rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.demo-btns { display: flex; gap: 8px; }
+#demo-slow[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#demo-pts { list-style: none; padding: 0; margin: 10px auto 14px; display: flex; flex-direction: column; gap: 4px; }
+#demo-pts li { padding: 6px 10px; border-radius: 8px; color: var(--ink-sub); }
+#demo-pts li.on { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+#demo-video { display: block; width: fit-content; }
+#demo .btn { flex: 0 0 auto; width: auto; white-space: nowrap; }
