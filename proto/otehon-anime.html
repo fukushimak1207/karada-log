@@ -1,0 +1,393 @@
+<title>お手本アニメ試作</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* 縦一列のカード。アプリの実行画面と同じ色味にそろえる */
+:root {
+  --bg: #f3f6f5;
+  --surface: #ffffff;
+  --ink: #1d2b29;
+  --ink-sub: #5d6f6c;
+  --accent: #2e7a72;
+  --far: #a9bab7;
+  --floor: #c9d4d2;
+  --line: #dde5e3;
+  --hl: #e1efec;
+  --font: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121a19; --surface: #1b2523; --ink: #e4ecea; --ink-sub: #9fb1ae;
+    --accent: #5fb8ac; --far: #4f6461; --floor: #34413f; --line: #2a3634; --hl: #23403b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121a19; --surface: #1b2523; --ink: #e4ecea; --ink-sub: #9fb1ae;
+  --accent: #5fb8ac; --far: #4f6461; --floor: #34413f; --line: #2a3634; --hl: #23403b;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+main { max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1 { margin: 0; font-size: 1.25rem; text-wrap: balance; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.card h2 { margin: 0; font-size: 1.05rem; }
+.load { margin: 0; color: var(--ink-sub); font-size: 0.9rem; }
+canvas { width: 100%; max-width: 100%; aspect-ratio: 320 / 232; display: block; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.phase { font-size: 1.6rem; font-weight: 700; color: var(--accent); min-height: 2rem;
+         font-variant-numeric: tabular-nums; }
+.tempo { color: var(--ink-sub); font-size: 0.85rem; }
+button {
+  font: inherit; font-weight: 700; padding: 8px 16px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer;
+}
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btns { display: flex; gap: 8px; }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.pts { margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.pts li { padding: 6px 10px; border-radius: 8px; color: var(--ink-sub); font-size: 0.92rem;
+          transition: background-color .2s, color .2s; }
+.pts li.on { background: var(--hl); color: var(--ink); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .pts li { transition: none; } }
+</style>
+
+<main>
+  <h1>お手本アニメ試作</h1>
+
+  <section class="card">
+    <h2>スクワット</h2>
+    <p class="load">スクワット（両脚）</p>
+    <canvas id="cv-squat"></canvas>
+    <div class="row">
+      <span class="phase" id="ph-squat"></span>
+      <span class="btns">
+        <button id="sl-squat" aria-pressed="false">ゆっくり</button>
+        <button id="bt-squat">止める</button>
+      </span>
+    </div>
+    <ul class="pts" id="pts-squat"></ul>
+    <span class="tempo">下ろす2秒・上げる1秒（上と下で1秒ずつ止める）</span>
+  </section>
+
+  <section class="card">
+    <h2>ブルガリアンスクワット</h2>
+    <p class="load">片脚を椅子に乗せて</p>
+    <canvas id="cv-bulg"></canvas>
+    <div class="row">
+      <span class="phase" id="ph-bulg"></span>
+      <span class="btns">
+        <button id="sl-bulg" aria-pressed="false">ゆっくり</button>
+        <button id="bt-bulg">止める</button>
+      </span>
+    </div>
+    <ul class="pts" id="pts-bulg"></ul>
+    <span class="tempo">下ろす2秒・上げる1秒（上と下で1秒ずつ止める）</span>
+  </section>
+
+  <section class="card">
+    <h2>ヒップリフト</h2>
+    <p class="load">片脚＋上で3秒止める</p>
+    <canvas id="cv-hip"></canvas>
+    <div class="row">
+      <span class="phase" id="ph-hip"></span>
+      <span class="btns">
+        <button id="sl-hip" aria-pressed="false">ゆっくり</button>
+        <button id="bt-hip">止める</button>
+      </span>
+    </div>
+    <ul class="pts" id="pts-hip"></ul>
+    <span class="tempo">上げる1秒・止める3秒・下ろす2秒（下で1秒止める）</span>
+  </section>
+</main>
+
+<script>
+/* 棒人間を関節の角度で動かす。角度は度、x 右・y 上(地面が 0)。
+ * 絵は描かず、姿勢を数で決めて線を引く */
+const W = 320, H = 232, GROUND = 214;   // 論理サイズと地面の高さ(画面座標)
+const L = { shin: 46, thigh: 48, torso: 58, neck: 9, head: 11, upper: 31, fore: 29, foot: 15 };
+
+const rad = d => d * Math.PI / 180;
+const step = (p, len, deg) => ({ x: p.x + len * Math.cos(rad(deg)), y: p.y + len * Math.sin(rad(deg)) });
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => t * t * (3 - 2 * t);
+const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+const lerpPose = (A, B, t) => { const o = {}; for (const k in A) o[k] = lerp(A[k], B[k], t); return o; };
+
+/* 腿と脛の長さで、腰から足首へ届く膝の位置を出す。膝は腰→足首の線の左回り側へ折れる */
+function knee(hip, ankle) {
+  const dx = ankle.x - hip.x, dy = ankle.y - hip.y;
+  const d = Math.min(Math.hypot(dx, dy), L.thigh + L.shin - 0.01);
+  const a = Math.acos((L.thigh * L.thigh + d * d - L.shin * L.shin) / (2 * L.thigh * d));
+  const base = Math.atan2(dy, dx);
+  const ang = base + a;
+  return { x: hip.x + L.thigh * Math.cos(ang), y: hip.y + L.thigh * Math.sin(ang) };
+}
+
+function colors() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = n => cs.getPropertyValue(n).trim();
+  return { ink: v('--ink'), far: v('--far'), floor: v('--floor'), accent: v('--accent'),
+           surface: v('--surface'), font: v('--font') };
+}
+
+function setup(cv) {
+  const r = window.devicePixelRatio || 1;
+  cv.width = W * r; cv.height = H * r;
+  const g = cv.getContext('2d');
+  g.setTransform(r, 0, 0, r, 0, 0);
+  return g;
+}
+
+/* 画面座標へ */
+const P = p => [p.x, GROUND - p.y];
+
+function seg(g, pts, color, w) {
+  g.strokeStyle = color; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath();
+  pts.forEach((p, i) => { const [x, y] = P(p); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+  g.stroke();
+}
+
+function head(g, c, color) {
+  const [x, y] = P(c);
+  g.fillStyle = color; g.beginPath(); g.arc(x, y, L.head, 0, Math.PI * 2); g.fill();
+}
+
+function floor(g, col) {
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = col.floor; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(12, GROUND + 2); g.lineTo(W - 12, GROUND + 2); g.stroke();
+}
+
+/* 関節に点を打ち、線を引いた先にポイントを書く。dx, dy は画面上のずらし */
+function cue(g, J, c, col) {
+  const at = J[c.at];
+  if (!at) return;
+  const [x, y] = P(at);
+  g.font = '700 12px ' + col.font;
+  const w = g.measureText(c.text).width + 14, h = 22;
+  const bx = Math.max(4, Math.min(W - w - 4, x + c.dx - w / 2));
+  const by = Math.max(4, Math.min(H - h - 4, y + c.dy - h / 2));
+  g.strokeStyle = col.accent; g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(x, y); g.lineTo(bx + w / 2, by + h / 2); g.stroke();
+  g.fillStyle = col.accent; g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill();
+  g.fillStyle = col.surface; g.strokeStyle = col.accent;
+  g.beginPath(); g.roundRect(bx, by, w, h, 11); g.fill(); g.stroke();
+  g.fillStyle = col.ink; g.textBaseline = 'middle';
+  g.fillText(c.text, bx + 7, by + h / 2 + 1);
+}
+
+/* ---------- 種目ごとの姿勢 ---------- */
+
+// スクワット: 足首を固定して、脛・腿・胴の角度で決める
+const SQUAT = {
+  top:    { shin: 90, thigh: 90,  torso: 90, arm: -82 },
+  bottom: { shin: 62, thigh: 168, torso: 52, arm: 4 },
+};
+function drawSquat(g, s, col) {
+  floor(g, col);
+  const ankle = { x: 150, y: 4 };
+  const k = step(ankle, L.shin, s.shin);
+  const hip = step(k, L.thigh, s.thigh);
+  const sh = step(hip, L.torso, s.torso);
+  const hd = step(sh, L.neck + L.head, s.torso);
+  const toe = { x: ankle.x + L.foot, y: 0 };
+  // 奥の手足は薄く、少しずらす
+  const off = { x: -5, y: 0 };
+  const sh2 = { x: sh.x + off.x, y: sh.y };
+  const el2 = step(sh2, L.upper, s.arm), wr2 = step(el2, L.fore, s.arm);
+  seg(g, [sh2, el2, wr2], col.far, 7);
+  seg(g, [{ x: toe.x + off.x, y: 0 }, { x: ankle.x + off.x, y: ankle.y }, { x: k.x + off.x, y: k.y }, hip], col.far, 9);
+  seg(g, [toe, ankle, k, hip], col.ink, 9);
+  seg(g, [hip, sh], col.ink, 11);
+  head(g, hd, col.ink);
+  const el = step(sh, L.upper, s.arm), wr = step(el, L.fore, s.arm);
+  seg(g, [sh, el, wr], col.ink, 7);
+  return { hip, knee: k, ankle, sh, mid: mid(hip, sh) };
+}
+
+// ブルガリアン: 前脚は足首から、後ろ脚は椅子の上の足先へ膝を合わせる
+const BULG = {
+  top:    { shin: 86, thigh: 103, torso: 82 },
+  bottom: { shin: 70, thigh: 168, torso: 70 },
+};
+const BENCH = { x: 52, w: 58, h: 44 };
+function drawBulg(g, s, col) {
+  floor(g, col);
+  // 椅子
+  g.fillStyle = col.floor;
+  g.fillRect(BENCH.x, GROUND - BENCH.h, BENCH.w, 7);
+  g.fillRect(BENCH.x + 4, GROUND - BENCH.h + 7, 5, BENCH.h - 5);
+  g.fillRect(BENCH.x + BENCH.w - 9, GROUND - BENCH.h + 7, 5, BENCH.h - 5);
+
+  const ankle = { x: 176, y: 4 };
+  const k = step(ankle, L.shin, s.shin);
+  const hip = step(k, L.thigh, s.thigh);
+  const sh = step(hip, L.torso, s.torso);
+  const hd = step(sh, L.neck + L.head, s.torso);
+  const toe = { x: ankle.x + L.foot, y: 0 };
+
+  // 後ろ脚: 足の甲を椅子に乗せる
+  const rAnk = { x: BENCH.x + BENCH.w - 4, y: BENCH.h + 6 };
+  const rToe = { x: rAnk.x - L.foot, y: BENCH.h + 3 };
+  const rK = knee(hip, rAnk);
+  seg(g, [hip, rK, rAnk, rToe], col.far, 9);
+
+  // 奥の腕は下げたまま
+  const arm = -92;
+  const sh2 = { x: sh.x - 4, y: sh.y };
+  seg(g, [sh2, step(sh2, L.upper, arm), step(step(sh2, L.upper, arm), L.fore, arm + 4)], col.far, 7);
+
+  seg(g, [toe, ankle, k, hip], col.ink, 9);
+  seg(g, [hip, sh], col.ink, 11);
+  head(g, hd, col.ink);
+  const el = step(sh, L.upper, arm + 6);
+  seg(g, [sh, el, step(el, L.fore, arm + 10)], col.ink, 7);
+  return { hip, knee: k, ankle, sh, mid: mid(hip, sh), rknee: rK };
+}
+
+// ヒップリフト: 肩を床につけ、胴の角度でお尻を持ち上げる。上げた脚は腿の向きにまっすぐ
+const HIP = {
+  down: { torso: 3 },
+  up:   { torso: 35 },
+};
+function drawHip(g, s, col) {
+  floor(g, col);
+  const sh = { x: 92, y: 9 };
+  const hip = step(sh, L.torso, s.torso);
+  const ankle = { x: 206, y: 4 };
+  const toe = { x: ankle.x + L.foot, y: 0 };
+  const k = knee(hip, ankle);
+  // 上げた脚: 腿の向きをそのまま延ばす
+  const tAng = Math.atan2(k.y - hip.y, k.x - hip.x) * 180 / Math.PI;
+  const k2 = step(hip, L.thigh, tAng);
+  const ank2 = step(k2, L.shin, tAng);
+  const toe2 = step(ank2, L.foot * 0.8, tAng + 70);
+
+  // 奥の脚(床についている方)
+  seg(g, [toe, ankle, k, hip], col.far, 9);
+  // 腕は床に沿わせる
+  seg(g, [sh, { x: sh.x + 30, y: 5 }, { x: sh.x + 58, y: 4 }], col.ink, 7);
+  seg(g, [hip, sh], col.ink, 11);
+  head(g, { x: sh.x - L.neck - L.head, y: L.head }, col.ink);
+  seg(g, [hip, k2, ank2, toe2], col.ink, 9);
+  return { hip, knee: k, ankle, sh, mid: mid(hip, sh) };
+}
+
+/* ---------- 動かし方(秒ごとの流れ) ---------- */
+
+/* phases: [名前, 秒, 始まりの姿勢→終わりの姿勢(0〜1)] */
+/* cues: どの局面で、どの関節に、何を書くか。一覧にも同じ順で並ぶ */
+const RUNS = [
+  { id: 'squat', draw: drawSquat, A: SQUAT.top, B: SQUAT.bottom,
+    phases: [['下ろす', 2, 0, 1], ['上げる', 1, 1, 0]],
+    cues: [
+      { when: '下ろす', at: 'hip',   text: 'お尻を後ろへ引く',   dx: -62, dy: -34 },
+      { when: '下ろす', at: 'ankle', text: 'かかとは床につけたまま', dx: 80, dy: -36 },
+      { when: '上げる', at: 'knee',  text: '膝はつま先の向きへ', dx: 72, dy: -8 },
+      { when: '上げる', at: 'mid',   text: '背中はまっすぐ',     dx: 78, dy: -40 },
+    ] },
+  { id: 'bulg', draw: drawBulg, A: BULG.top, B: BULG.bottom,
+    phases: [['下ろす', 2, 0, 1], ['上げる', 1, 1, 0]],
+    cues: [
+      { when: '下ろす', at: 'rknee', text: '後ろの膝は床の手前まで', dx: -30, dy: -96 },
+      { when: '下ろす', at: 'ankle', text: '体重は前の脚に',       dx: 56, dy: -60 },
+      { when: '上げる', at: 'ankle', text: '前のかかとで押して立つ', dx: 40, dy: -24 },
+      { when: '上げる', at: 'mid',   text: '上体は少し前へ',       dx: 66, dy: -44 },
+    ] },
+  { id: 'hip', draw: drawHip, A: HIP.down, B: HIP.up,
+    phases: [['上げる', 1, 0, 1], ['止める', 3, 1, 1], ['下ろす', 2, 1, 0]],
+    cues: [
+      { when: '上げる', at: 'ankle', text: 'かかとで床を押す',     dx: 0, dy: -110 },
+      { when: '止める', at: 'mid',   text: '肩から膝まで一直線',   dx: -20, dy: -90 },
+      { when: '止める', at: 'hip',   text: 'お尻を締める',         dx: -10, dy: -50 },
+      { when: '下ろす', at: 'hip',   text: '腰を反らさず、ゆっくり', dx: -40, dy: -70 },
+    ] },
+];
+
+/* 動きの始まりと終わりで少し止める。止める段階(3秒止めるなど)と隣り合う側は足さない */
+const PAUSE = 0.5;
+function withPauses(phases) {
+  const moving = p => p[2] !== p[3];
+  const out = [];
+  phases.forEach((p, i) => {
+    const prev = phases[(i - 1 + phases.length) % phases.length];
+    const next = phases[(i + 1) % phases.length];
+    if (moving(p) && moving(prev)) out.push([p[0], PAUSE, p[2], p[2]]);
+    out.push(p);
+    if (moving(p) && moving(next)) out.push([p[0], PAUSE, p[3], p[3]]);
+  });
+  return out;
+}
+
+const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+RUNS.forEach(r => {
+  r.phases = withPauses(r.phases);
+  r.g = setup(document.getElementById('cv-' + r.id));
+  r.ph = document.getElementById('ph-' + r.id);
+  r.bt = document.getElementById('bt-' + r.id);
+  r.cycle = r.phases.reduce((n, p) => n + p[1], 0);
+  r.playing = !reduce;
+  r.speed = 1;  // 「ゆっくり」で半分
+  r.held = 0;   // 動きの上での経過秒(速さを変えても途切れないよう、足していく)
+  r.bt.textContent = r.playing ? '止める' : '動かす';
+  r.li = r.cues.map(c => {
+    const li = document.createElement('li');
+    li.textContent = c.text;
+    document.getElementById('pts-' + r.id).appendChild(li);
+    return li;
+  });
+  r.bt.addEventListener('click', () => {
+    r.playing = !r.playing;
+    r.bt.textContent = r.playing ? '止める' : '動かす';
+  });
+  const sl = document.getElementById('sl-' + r.id);
+  sl.addEventListener('click', () => {
+    r.speed = r.speed === 1 ? 0.5 : 1;
+    sl.setAttribute('aria-pressed', String(r.speed !== 1));
+  });
+});
+
+function frameOf(r, sec) {
+  let t = sec % r.cycle;
+  for (const [name, len, a, b] of r.phases) {
+    if (t < len) {
+      const p = lerp(a, b, ease(t / len));
+      const left = Math.ceil(len - t);
+      return { p, name, label: name === '止める' ? '止める ' + left : name };
+    }
+    t -= len;
+  }
+  return { p: 0, name: '', label: '' };
+}
+
+let last = performance.now();
+function tick(now) {
+  const col = colors();
+  const dt = Math.min(0.1, (now - last) / 1000);   // 裏に回っていた間は飛ばさない
+  last = now;
+  RUNS.forEach(r => {
+    if (r.playing) r.held += dt * r.speed;
+    const f = frameOf(r, r.held);
+    const J = r.draw(r.g, lerpPose(r.A, r.B, f.p), col);
+    r.cues.forEach((c, i) => {
+      const on = c.when === f.name;
+      if (on) cue(r.g, J, c, col);
+      if (r.li[i].classList.contains('on') !== on) r.li[i].classList.toggle('on', on);
+    });
+    if (r.ph.textContent !== f.label) r.ph.textContent = f.label;
+  });
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script>

@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>アニメ確認シート</title>
+<style>
+:root { --ink:#1d2b2a; --ink-sub:#9aaba9; --line:#c9d6d4; --accent:#2f7d79; --card:#fff; }
+body { margin:4px; font: 11px system-ui, sans-serif; background:#f3f7f6; }
+.row { display:flex; gap:4px; align-items:center; margin-bottom:4px; }
+.row b { width:90px; }
+canvas { width:220px; height:160px; background:#fff; border:1px solid #ddd; }
+</style>
+<div id="out"></div>
+<script>document.write('<script src="../app/anime.js?' + Date.now() + '"><\/script>');</script>
+<script>
+const LV = { squat:3, hip:3, calf:3, push:4, pike:3, plank:3, splank:2, legraise:3, deadbug:3, roller:3 };
+const out = document.getElementById('out');
+const only = new URLSearchParams(location.search).get('k');
+Anime.keys().filter(k => !only || only.split(',').includes(k)).forEach(k => {
+  for (let lv = 0; lv < (LV[k] || 1); lv++) {
+    const d = Anime.make(k, lv);
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = '<b>' + k + ' ' + lv + '</b>';
+    // 動く局面ごとに、終わりの姿勢と吹き出しを描く
+    const tags = [...new Set(d.phases.map(p => p[4] || p[0]))];
+    tags.forEach(tag => {
+      const ph = d.phases.filter(p => (p[4] || p[0]) === tag);
+      const last = ph.reduce((a, p) => p[2] !== p[3] ? p : a, ph[ph.length - 1]);
+      const cv = document.createElement('canvas');
+      row.appendChild(cv);
+      // 1フレームだけ描くため、Player を一瞬動かして止める
+      const t = (() => { let s = 0; for (const p of d.phases) { if (p === last) return s + p[1] * 0.99; s += p[1]; } return 0; })();
+      const fake = Object.assign({}, d, { phases: [[tag, 1, 0, 0]], cycle: 1,
+        A: Object.assign({}, d.A), B: d.B });
+      const f = Anime.frameOf(d.phases, d.cycle, t);
+      const pose = {}; for (const key in d.A) pose[key] = d.A[key] + (d.B[key] - d.A[key]) * f.p;
+      fake.A = pose; fake.B = pose;
+      fake.cues = d.cues.filter(c => c.when === tag).map(c => Object.assign({}, c, { when: tag }));
+      const p = new Anime.Player(cv, fake);
+      p.stop();
+    });
+    out.appendChild(row);
+  }
+});
+</script>
