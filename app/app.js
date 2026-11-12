@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v45';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v46';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2609,6 +2609,20 @@ function videoUrl(ex) {
   return ex.ref ? ytWatch(ex.ref) : ytSearch(ex.name + ' やり方');
 }
 
+/* お手本動画はアプリの中で再生する。YouTube アプリへ飛ばすと戻ってこられないため。
+ * 動画が決まっていない種目だけ、YouTube の検索を別のタブで開く。 */
+function playDemoVideo() {
+  const ex = demo && exOf(demo.key);
+  if (!ex) return;
+  if (!ex.ref) { window.open(ytSearch(ex.name + ' やり方'), '_blank', 'noopener'); return; }
+  $('#demo-video').hidden = true;
+  $('#demo-frame').innerHTML = `
+    <div class="frame">
+      <iframe src="${ytEmbed(ex.ref)}" title="お手本" allow="autoplay; fullscreen; picture-in-picture"
+        allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </div>`;
+}
+
 /* 今の段階の動きを出す。アニメが読めなければ(古いキャッシュなど)動画を開く */
 function openDemo(key) {
   const ex = exOf(key);
@@ -2618,24 +2632,28 @@ function openDemo(key) {
   closeDemo();
   $('#demo-name').textContent = ex.name;
   $('#demo-load').textContent = loadLabel(key);
-  $('#demo-video').href = videoUrl(ex);
+  $('#demo-video').hidden = false;
+  $('#demo-frame').innerHTML = '';
   $('#demo-pts').innerHTML = def.cues.map(c => `<li>${escapeHtml(c.text)}</li>`).join('');
   $('#demo-slow').setAttribute('aria-pressed', 'false');
   $('#demo').hidden = false;
   const items = Array.from($('#demo-pts').children);
-  demo = new window.Anime.Player($('#demo-cv'), def, f => {
+  const player = new window.Anime.Player($('#demo-cv'), def, f => {
     if ($('#demo-phase').textContent !== f.label) $('#demo-phase').textContent = f.label;
     items.forEach((li, i) => {
       const on = f.on.indexOf(i) >= 0;
       if (li.classList.contains('on') !== on) li.classList.toggle('on', on);
     });
   });
+  player.key = key;
+  demo = player;
   $('#demo-play').textContent = demo.playing ? '止める' : '動かす';
 }
 
 function closeDemo() {
   if (demo) demo.stop();
   demo = null;
+  $('#demo-frame').innerHTML = '';   // 止めないと音が鳴り続ける
   $('#demo').hidden = true;
 }
 
@@ -2645,6 +2663,7 @@ function bindDemo() {
     if (b) openDemo(b.dataset.exDemo);
   });
   $('#demo-close').addEventListener('click', closeDemo);
+  $('#demo-video').addEventListener('click', playDemoVideo);
   $('#demo-play').addEventListener('click', () => {
     if (!demo) return;
     demo.playing = !demo.playing;

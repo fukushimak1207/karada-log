@@ -127,6 +127,15 @@
     return f;
   }
 
+  /* 正面向きの両腕。手の位置を決めると肘が決まる(肘は体の外側へ張る) */
+  function frontArms(g, f, hL, hR, col) {
+    const elL = ik(f.shL, hL, L.upper, L.fore, 1);
+    const elR = ik(f.shR, hR, L.upper, L.fore, -1);
+    arm(g, [f.shL, elL, hL], col);
+    arm(g, [f.shR, elR, hR], col);
+    return { elL: elL, elR: elR, wrL: hL, wrR: hR, wr: hR, el: elR, sh: f.shR };
+  }
+
   function drawFront(g, f, col) {
     leg(g, [f.footL, f.kneeL, f.hipL, f.hipR, f.kneeR, f.footR], col);
     trunk(g, f.hipC, f.shC, col);
@@ -464,20 +473,20 @@
 
   // チューブ ショルダープレス(チューブを足で踏む)
   DEFS.tshoulder = () => ({
-    A: { up: -80, fo: 95 }, B: { up: 78, fo: 84 },
+    A: { x: 42, y: 150 }, B: { x: 24, y: 206 },
     phases: PUSH,
     cues: [
-      C('押す', 'wr', '真上へ押し上げる'), C('押す', 'hip', '腰を反らせない'),
-      C('戻す', 'wr', '肩の高さまでゆっくり'), C('戻す', 'mid', '背中はまっすぐ'),
+      C('押す', 'wrR', '真上へ押し上げる'), C('押す', 'hipC', '腰を反らせない'),
+      C('戻す', 'wrR', '肩の高さまでゆっくり'), C('戻す', 'elR', '肘は体の前へ'),
     ],
     draw(g, s, col) {
       floor(g, col);
-      const f = stand(pt(156, 4), { shin: 90, thigh: 90, torso: 90 });
-      const a = limbs(f.sh, s.up, s.fo);
-      band(g, pt(f.ankle.x + 4, 1), a.wr, col);
-      drawStand(g, f, col);
-      arm(g, [f.sh, a.el, a.wr], col);
-      return Object.assign(f, a);
+      const f = front({ feet: 22 });
+      const hL = pt(160 - s.x, s.y), hR = pt(160 + s.x, s.y);
+      band(g, pt(f.footL.x, 1), hL, col);
+      band(g, pt(f.footR.x, 1), hR, col);
+      drawFront(g, f, col);
+      return Object.assign(f, frontArms(g, f, hL, hR, col));
     },
   });
 
@@ -506,23 +515,25 @@
 
   // チューブ ラットプルダウン(アンカーは一番上)
   DEFS.tlat = () => {
-    const AN = pt(222, 206);
+    const AN = pt(160, 210);                 // 頭の真上(画面に入る高さまで)
     return {
-      A: { up: 60, fo: 60 }, B: { up: -106, fo: 72 },
+      A: { x: 54, y: 196 }, B: { x: 40, y: 148 },
       phases: PULL,
       cues: [
-        C('引く', 'wr', '胸の横へ引き下ろす'), C('引く', 'sh', '肩甲骨を下げる'),
-        C('戻す', 'wr', '腕が伸びるまでゆっくり'), C('戻す', 'mid', '背中はまっすぐ'),
+        C('引く', 'wrR', '胸の横へ引き下ろす'), C('引く', 'shR', '肩甲骨を下げる'),
+        C('戻す', 'wrR', '腕が伸びるまでゆっくり'), C('戻す', 'hipC', '腰を反らせない'),
       ],
       draw(g, s, col) {
         floor(g, col);
-        anchor(g, AN, col);
-        const f = stand(pt(140, 4), { shin: 90, thigh: 90, torso: 94 });
-        const a = limbs(f.sh, s.up, s.fo);
-        band(g, AN, a.wr, col);
-        drawStand(g, f, col);
-        arm(g, [f.sh, a.el, a.wr], col);
-        return Object.assign(f, a);
+        const [ax, ay] = P(AN);
+        g.strokeStyle = col.floor; g.lineWidth = 4;
+        g.beginPath(); g.moveTo(ax - 26, ay); g.lineTo(ax + 26, ay); g.stroke();
+        const f = front({ feet: 22 });
+        const hL = pt(160 - s.x, s.y), hR = pt(160 + s.x, s.y);
+        band(g, AN, hL, col);
+        band(g, AN, hR, col);
+        drawFront(g, f, col);
+        return Object.assign(f, frontArms(g, f, hL, hR, col));
       },
     };
   };
@@ -583,34 +594,33 @@
       floor(g, col);
       const f = front({ feet: 24 });
       const wrL = pt(160 - s.x, 146), wrR = pt(160 + s.x, 146);
-      const elL = mid(f.shL, wrL), elR = mid(f.shR, wrR);
-      elL.y -= 2; elR.y -= 2;
       band(g, wrL, wrR, col);
       drawFront(g, f, col);
-      arm(g, [f.shL, elL, wrL], col);
-      arm(g, [f.shR, elR, wrR], col);
-      return Object.assign(f, { wrL: wrL, wrR: wrR, elR: elR });
+      return Object.assign(f, frontArms(g, f, wrL, wrR, col));
     },
   });
 
   // チューブ フェイスプル(アンカーは顔の高さ)
   DEFS.tface = () => {
-    const AN = pt(252, 168);
+    const AN = pt(160, 198);                 // 顔の高さ。正面から見ると体の手前なので、頭の上に出す
     return {
-      A: { up: 8, fo: 4 }, B: { up: 160, fo: 70 },
+      A: { x: 15, y: 152 }, B: { x: 58, y: 176 },
       phases: PULL,
       cues: [
-        C('引く', 'wr', '顔の横へ引く'), C('引く', 'sh', '肩甲骨を寄せる'),
-        C('戻す', 'wr', 'ゆっくり戻す'), C('戻す', 'mid', '胸を張ったまま'),
+        C('引く', 'wrR', '顔の横へ引く'), C('引く', 'shR', '肩甲骨を寄せる'),
+        C('引く', 'elR', '肘は肩より高く'),
+        C('戻す', 'wrR', 'ゆっくり戻す'), C('戻す', 'hipC', '胸を張ったまま'),
       ],
       draw(g, s, col) {
         floor(g, col);
-        anchor(g, AN, col);
-        const f = stand(pt(130, 4), { shin: 90, thigh: 90, torso: 90 });
-        const a = limbs(f.sh, s.up, s.fo);
-        band(g, AN, a.wr, col);
-        drawStand(g, f, col);
-        arm(g, [f.sh, a.el, a.wr], col);
+        const f = front({ feet: 22 });
+        const hL = pt(160 - s.x, s.y), hR = pt(160 + s.x, s.y);
+        band(g, AN, hL, col);
+        band(g, AN, hR, col);
+        drawFront(g, f, col);
+        const a = frontArms(g, f, hL, hR, col);
+        const [ax, ay] = P(AN);              // アンカーは手前にあるので点で示す
+        g.fillStyle = col.accent; g.beginPath(); g.arc(ax, ay, 4, 0, Math.PI * 2); g.fill();
         return Object.assign(f, a);
       },
     };

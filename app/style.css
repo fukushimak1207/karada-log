@@ -482,4 +482,5 @@ body.no-scroll { overflow: hidden; }
 #demo-pts li { padding: 6px 10px; border-radius: 8px; color: var(--ink-sub); }
 #demo-pts li.on { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
 #demo-video { display: block; width: fit-content; }
+#demo-frame { margin-top: 10px; }
 #demo .btn { flex: 0 0 auto; width: auto; white-space: nowrap; }
