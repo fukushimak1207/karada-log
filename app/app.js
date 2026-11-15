@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v46';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v47';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -229,6 +229,8 @@ const defaultState = () => ({
   spareRun: { lower: 0, upper: 0, back: 0, full: 0, core: 0 },
   videos: null,                                       // 編集したときだけ配列が入る
   todayPick: null,                                    // {d, ids:{slot:id}} 手で選んだ今日の動画
+  partPick: null,                                     // {d, part} 今日だけ手で選んだ部位
+  owed: [],                                           // ずらして飛ばした部位。翌日ここへ戻る
   lastExport: null,
   measure: { weekday: 0, last: null },                // 測る曜日(既定は日曜)と、最後に測った日
   evalSeen: false,                                    // 評価日の知らせを確認したか
@@ -266,6 +268,8 @@ function load() {
     const wd = Number(state.measure.weekday);
     state.measure.weekday = (Number.isInteger(wd) && wd >= 0 && wd <= 6) ? wd : 0;
     if (typeof state.measure.last !== 'string') state.measure.last = null;
+    if (!Array.isArray(state.owed)) state.owed = [];
+    state.owed = state.owed.filter(p => PARTS.includes(p));
     if (!state.starts || typeof state.starts !== 'object') state.starts = {};
     if (!state.gear || typeof state.gear !== 'object') state.gear = {};
     mergeNewVideos();
@@ -310,13 +314,65 @@ function logsOf(d) { return state.logs.filter(l => l.d === d); }
 // 次にやる部位 = 最後に記録した1本目の部位の次。
 // 2本目(追加の1本)はローテの基準にしない。基準にすると順番が飛ぶため。
 function nextPart() {
+  // 飛ばした部位があれば、まずそこへ戻る
+  if (Array.isArray(state.owed) && PARTS.includes(state.owed[0])) return state.owed[0];
   for (let i = state.logs.length - 1; i >= 0; i--) {
     const l = state.logs[i];
-    if (l.slot !== 1) continue;
+    // 順番を取り戻すために入れた日は、まわしの数に入れない
+    if (l.slot !== 1 || l.owed) continue;
     const idx = PARTS.indexOf(l.part);
     if (idx >= 0) return PARTS[(idx + 1) % PARTS.length];
   }
   return PARTS[0];
+}
+
+/* 今日やる部位。手で入れ替えた日はそれを出す */
+function todayPart() {
+  const p = state.partPick;
+  if (p && p.d === todayStr() && PARTS.includes(p.part)) return p.part;
+  return nextPart();
+}
+
+/* 今日だけ部位を入れ替える。今日の記録を始めた後は変えない(何をやったか分からなくなる) */
+function setTodayPart(part) {
+  if (!PARTS.includes(part)) return false;
+  if (logsOf(todayStr()).some(l => l.slot === 1)) return false;
+  state.partPick = { d: todayStr(), part };
+  save();
+  return true;
+}
+
+/* 1日の1本目を記録したときに、まわしの順番の帳尻を合わせる。
+ * 入れ替えで飛ばした部位は owed に覚えておき、翌日そこへ戻る。
+ * 戻ってやった分は owed から外し、記録に印を付けて「次の部位」の計算から外す
+ * (そうしないと、戻った部位の次から数え直してしまう)。 */
+function settleOwed(part) {
+  if (!Array.isArray(state.owed)) state.owed = [];
+  if (!PARTS.includes(part)) return {};
+  const wanted = nextPart();                     // owed を触る前に見る
+  const i = state.owed.indexOf(part);
+  if (i >= 0) state.owed.splice(i, 1);
+  let push = null;
+  if (wanted !== part && PARTS.includes(wanted) && !state.owed.includes(wanted)) {
+    state.owed.push(wanted);
+    push = wanted;
+  }
+  return { owed: i >= 0, push: push };
+}
+
+/* 取り消したときに、ずらした順番も元へ戻す(消すのは今日の分だけなので、そのまま逆をやれる) */
+function restoreOwed(l) {
+  if (!Array.isArray(state.owed)) state.owed = [];
+  if (l.owedPush && PARTS.includes(l.owedPush)) {
+    const i = state.owed.indexOf(l.owedPush);
+    if (i >= 0) state.owed.splice(i, 1);
+  }
+  if (l.owed && PARTS.includes(l.part) && !state.owed.includes(l.part)) state.owed.unshift(l.part);
+}
+
+/* 1本目をこれから記録するのか(今日まだ1本目が無いか) */
+function firstOfToday() {
+  return !logsOf(todayStr()).some(l => l.slot === 1);
 }
 
 // その部位で直近にやった細かい部位(胸・背中など)。偏りを避けるために使う
@@ -455,7 +511,7 @@ function todaysPlan() {
     const v = findVideo(picked);
     if (v) return { video: v, part: v.part, level: v.level };
   }
-  const part = nextPart();
+  const part = todayPart();
   const level = state.levels[part] || 'easy';
   const video = pickVideo(part, level, recentIds(6));
   return { video, part, level };
@@ -481,7 +537,7 @@ function planFor(slot) {
   const d = todayStr();
   const done = logsOf(d).map(l => l.id);
 
-  const mainPart = (logsOf(d).find(l => l.slot === 1) || {}).part || nextPart();
+  const mainPart = (logsOf(d).find(l => l.slot === 1) || {}).part || todayPart();
   const part = mainPart === 'core' ? 'upper' : 'core';
   const level = state.levels[part] || 'easy';
   const v = pickVideo(part, level, done);
@@ -493,7 +549,7 @@ function nextPlan() {
   const todayLogs = logsOf(d);
   const first = todayLogs.find(l => l.slot === 1);
   const done = todayLogs.map(l => l.id);
-  const part = first ? first.part : nextPart();
+  const part = first ? first.part : todayPart();
   const level = first ? first.level : (state.levels[part] || 'easy');
 
   const v = pickVideo(part, level, done);
@@ -513,7 +569,11 @@ function recordDone(video, part, level, slot) {
   // 決められた本数(PLAN_SLOTS)を超えて、実際にやった日だけ数える。
   // 2本目は毎日やる前提になったので、「2本目をやった=余力あり」ではなくなった。
   const firstExtra = slot > PLAN_SLOTS && !logsOf(d).some(l => l.slot > PLAN_SLOTS);
-  state.logs.push({ d, id: video.id, part, level, spare: null, slot });
+  const st = (slot === 1 && firstOfToday()) ? settleOwed(part) : {};
+  const log = { d, id: video.id, part, level, spare: null, slot };
+  if (st.owed) log.owed = true;
+  if (st.push) log.owedPush = st.push;
+  state.logs.push(log);
   if (firstExtra) countSpareDay(part);
   save();
 }
@@ -567,9 +627,10 @@ function undoToday() {
   const d = todayStr();
   const before = state.logs.length;
   // 同じ種目が複数あれば、一番古いものの控えまで戻す
-  state.logs.filter(l => l.d === d).reverse().forEach(restoreRx);
+  state.logs.filter(l => l.d === d).reverse().forEach(l => { restoreRx(l); restoreOwed(l); });
   state.logs = state.logs.filter(l => l.d !== d);
   state.todayPick = null;
+  state.partPick = null;
   save();
   return before - state.logs.length;
 }
@@ -579,7 +640,7 @@ function undoEx(key) {
   const d = todayStr();
   const hit = state.logs.filter(l => l.d === d && l.ex === key);
   if (!hit.length) return 0;
-  hit.slice().reverse().forEach(restoreRx);
+  hit.slice().reverse().forEach(l => { restoreRx(l); restoreOwed(l); });
   state.logs = state.logs.filter(l => !(l.d === d && l.ex === key));
   save();
   return hit.length;
@@ -1884,7 +1945,7 @@ function menuFor(minutes) {
   /* 今日すでに記録があれば、その部位のまま続ける。
    * nextPart() をそのまま使うと、1種目やった時点で残りが翌日の部位に変わってしまう。 */
   const first = logsOf(todayStr()).find(l => l.slot === 1);
-  const part = first ? first.part : nextPart();
+  const part = first ? first.part : todayPart();
   const n = Math.max(1, Math.round((Number(minutes) || MIN_PER_EX) / MIN_PER_EX));
   const pool = EXERCISES.filter(e => e.part === part);
   if (!pool.length) return { part, items: [] };
@@ -1918,7 +1979,8 @@ function recordEx(key, done, sets) {
   const ex = exOf(key);
   if (!ex) return;
   const before = rxOf(key);
-  state.logs.push({
+  const st = firstOfToday() ? settleOwed(ex.part) : {};
+  const log = {
     d: todayStr(), id: 'ex:' + key, ex: key, part: ex.part,
     level: String(before.load), spare: null, slot: 1, done: Number(done),
     // 何セット目の、どちら側で、いくつできたか
@@ -1927,7 +1989,10 @@ function recordEx(key, done, sets) {
       : null,
     // 消したときに戻せるよう、押す前の処方を控えておく
     prev: { load: before.load, reps: before.reps, last: before.last, updated: before.updated },
-  });
+  };
+  if (st.owed) log.owed = true;
+  if (st.push) log.owedPush = st.push;
+  state.logs.push(log);
   clearDraft(key);
   applyResult(key, done);
 }
@@ -2189,10 +2254,16 @@ function renderMenu() {
     ? menu.items.map(exCardHtml).join('')
     : '<div class="card"><p class="note">出せる種目がありません。</p></div>';
 
+  // 記録を始める前だけ、今日の部位を入れ替えられる
+  const head = firstOfToday()
+    ? `<div class="time-grid">` + PARTS.map(p =>
+        `<button type="button" class="time-tile${p === menu.part ? ' on' : ''}" data-part="${p}">${escapeHtml(PART_LABEL[p])}</button>`).join('') + `</div>`
+    : `<h2 class="sec-title">${escapeHtml(PART_LABEL[menu.part] || '')}</h2>`;
+
   el.innerHTML = `
     <div class="time-grid">${times}</div>
+    ${head}
     <button id="btn-run" class="btn primary wide">全部</button>
-    <h2 class="sec-title">${escapeHtml(PART_LABEL[menu.part] || '')}</h2>
     ${cards}
     <div class="btn-row">
       <button id="btn-remeasure" class="btn small">測り直す</button>
@@ -2206,6 +2277,12 @@ function bindMenu() {
       state.rxMin = Number(t.dataset.min);
       save();
       renderMenu();
+      return;
+    }
+
+    const pt = ev.target.closest('[data-part]');
+    if (pt) {
+      if (setTodayPart(pt.dataset.part)) renderMenu();
       return;
     }
 
