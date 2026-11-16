@@ -16,6 +16,9 @@
   --easy: #4e9a5f;
   --normal: #c78a1e;
   --hard: #c0504a;
+  --hot: #e5893a;          /* お手本で効く場所を光らせる色 */
+  --hot-soft: #fbeadb;     /* 「効くところ」の札 */
+  --hot-ink: #8a4a12;
   --danger: #b03a33;
   --radius: 14px;
 }
@@ -32,6 +35,9 @@
     --easy: #6fbf80;
     --normal: #e0ae4a;
     --hard: #e07a73;
+    --hot: #e0904a;
+    --hot-soft: #3a2a1c;
+    --hot-ink: #e8b183;
     --danger: #e07a73;
   }
 }
@@ -429,6 +435,16 @@ body.no-scroll { overflow: hidden; }
 #run-count { margin: 0; font-size: 2.6rem; font-weight: 700; line-height: 1.1;
              font-variant-numeric: tabular-nums; }
 #run-next { margin: 8px 0 20px; color: var(--ink-sub); }
+#run-tags, #demo-tags { margin: 4px 0 0; }
+#run-cv { width: 100%; max-width: 320px; aspect-ratio: 320 / 232; margin: 4px 0;
+          background: var(--card); border-radius: var(--radius); }
+/* お手本を出しているときは、秒の文字を小さくして画面に収める */
+#run-cv:not([hidden]) ~ #run-num { font-size: 3.4rem; margin: 2px 0; }
+
+/* 効くところの札 */
+.tags { display: inline-flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.tag { background: var(--hot-soft); color: var(--hot-ink); border-radius: 999px;
+       padding: 1px 10px; font-size: .78rem; line-height: 1.6; }
 #run .btn-row { width: 100%; max-width: 420px; }
 
 #run-ask { margin: 4px 0 16px; }

@@ -7,7 +7,8 @@
   'use strict';
 
   const W = 320, H = 232, GROUND = 214;   // 論理サイズと床の高さ(画面座標)
-  const L = { shin: 46, thigh: 48, torso: 58, neck: 9, head: 11, upper: 31, fore: 29, foot: 15 };
+  const L = { shin: 46, thigh: 48, torso: 58, neck: 9, head: 13, upper: 31, fore: 29, foot: 15 };
+  const TH = { leg: 14, arm: 11, trunk: 20 };   // 線の太さ。細いと体の形が分かりにくい
   const ARM = L.upper + L.fore;
   const PAUSE = 0.5;                      // 動きの始まりと終わりで止める秒数
 
@@ -79,9 +80,14 @@
     g.beginPath(); g.moveTo(10, GROUND + 2); g.lineTo(W - 10, GROUND + 2); g.stroke();
   }
 
-  const leg = (g, pts, col, far) => line(g, pts, far ? col.far : col.ink, 9);
-  const arm = (g, pts, col, far) => line(g, pts, far ? col.far : col.ink, 7);
-  const trunk = (g, a, b, col) => line(g, [a, b], col.ink, 11);
+  /* 手前の手足は、背景の色で縁取ってから描く(胴や奥の手足と重なっても形が分かるように) */
+  function limb(g, pts, col, far, w) {
+    if (!far && col.card) line(g, pts, col.card, w + 5);
+    line(g, pts, far ? col.far : col.ink, w);
+  }
+  const leg = (g, pts, col, far) => limb(g, pts, col, far, TH.leg);
+  const arm = (g, pts, col, far) => limb(g, pts, col, far, TH.arm);
+  const trunk = (g, a, b, col) => line(g, [a, b], col.ink, TH.trunk);
 
   /* 横向きの立ち姿。足首から上へ角度でつなぐ */
   function stand(ankle, s) {
@@ -139,7 +145,7 @@
   function drawFront(g, f, col) {
     leg(g, [f.footL, f.kneeL, f.hipL, f.hipR, f.kneeR, f.footR], col);
     trunk(g, f.hipC, f.shC, col);
-    line(g, [f.shL, f.shR], col.ink, 9);
+    line(g, [f.shL, f.shR], col.ink, TH.arm + 2);
     headAt(g, f.hd, col.ink);
   }
 
@@ -540,7 +546,7 @@
 
   // チューブ シーテッドロウ(長座で足裏に掛ける)
   DEFS.trow = () => ({
-    A: { t: 82, up: -25, fo: -20 }, B: { t: 92, up: 195, fo: 0 },
+    A: { t: 82, k: 0 }, B: { t: 92, k: 1 },
     phases: PULL,
     cues: [
       C('引く', 'el', '肘をわき腹に沿わせて引く'), C('引く', 'mid', '胸を張ったまま'),
@@ -552,7 +558,9 @@
       const knee = step(hip, L.thigh, 8), ankle = step(knee, L.shin, -10);
       const toe = step(ankle, L.foot, 80);
       const sh = step(hip, L.torso, s.t), hd = step(sh, L.neck + L.head, s.t);
-      const a = limbs(sh, s.up, s.fo);
+      // 手は前から体の横へまっすぐ引く。肘は後ろへ抜ける(角度で動かすと手が頭の上を通る)
+      const wr = pt(lerp(sh.x + 54, sh.x + 4, s.k), lerp(sh.y - 22, sh.y - 30, s.k));
+      const a = { el: ik(sh, wr, L.upper, L.fore, -1), wr: wr };
       band(g, pt(ankle.x + 4, ankle.y + 8), a.wr, col);
       leg(g, [pt(hip.x - 2, hip.y), pt(knee.x - 3, knee.y), pt(ankle.x - 3, ankle.y), pt(toe.x - 3, toe.y)], col, true);
       leg(g, [hip, knee, ankle, toe], col);
@@ -832,18 +840,121 @@
 
   /* ---------- 再生 ---------- */
 
+  /* 効く場所。関節の名前なら丸く、2つ並べたら その間を太く光らせる */
+  const HOT = {
+    squat: ['hip', ['hip', 'knee']], hip: ['hip'], calf: ['ankle'], tdead: ['hip', ['hip', 'knee']],
+    push: [['sh', 'el'], 'sh'], pike: ['sh'], tpress: ['sh'], tshoulder: ['shL', 'shR'],
+    ttriceps: [['sh', 'el']], tlat: ['shL', 'shR'], trow: [['sh', 'mid']], tbrow: [['sh', 'mid']],
+    tapart: ['shL', 'shR'], tface: ['shL', 'shR'], tpullover: [['sh', 'mid']],
+    plank: ['mid'], splank: ['mid'], legraise: ['mid'], deadbug: ['mid'], roller: ['mid'],
+    tchop: [['hipL', 'shR']],
+  };
+  /* 動く向きを矢印で見せる関節。止めている間は出さない */
+  const MOVE = {
+    squat: ['hip'], hip: ['hip'], calf: ['ankle'], tdead: ['hip'],
+    push: ['sh'], pike: ['sh'], tpress: ['wr'], tshoulder: ['wrL', 'wrR'],
+    ttriceps: ['wr'], tlat: ['wrL', 'wrR'], trow: ['wr'], tbrow: ['wr'],
+    tapart: ['wrL', 'wrR'], tface: ['wrL', 'wrR'], tpullover: ['wr'],
+    legraise: ['ankle'], deadbug: ['wr'], roller: ['wr'], tchop: ['wr'],
+  };
+
+  /* 描かずに関節の位置だけ求めるための、何もしない筆 */
+  const NOOP = new Proxy({}, { get: () => () => {}, set: () => true });
+
+  /* A から B へ動かしたときの、関節の通り道。動きが小さすぎるものは出さない。
+   * 手足に重なって見えなくならないよう、体の中心から離れる向きへ少しずらす */
+  function pathsOf(def) {
+    if (def._paths) return def._paths;
+    const out = [];
+    const center = (def.draw(NOOP, lerpPose(def.A, def.B, 0.5), {}) || {}).mid;
+    (def.move || []).forEach(k => {
+      const pts = [];
+      for (let i = 0; i <= 24; i++) {
+        const J = def.draw(NOOP, lerpPose(def.A, def.B, i / 24), {}) || {};
+        if (J[k]) pts.push(pt(J[k].x, J[k].y));
+      }
+      let len = 0;
+      for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      if (len < 14) return;
+      const a = pts[0], b = pts[pts.length - 1];
+      if (center && Math.hypot(a.x - b.x, a.y - b.y) > 6) {
+        const c = pts[Math.floor(pts.length / 2)];
+        const dx = c.x - center.x, dy = c.y - center.y, n = Math.hypot(dx, dy) || 1;
+        pts.forEach(q => { q.x += 18 * dx / n; q.y += 18 * dy / n; });
+      }
+      out.push(pts);
+    });
+    def._paths = out;
+    return out;
+  }
+
+  /* 効く場所を光らせる。棒人間の後ろに置いて線を隠さない */
+  function hotSpots(g, J, def, col) {
+    const list = def.hot || [];
+    if (!list.length || !col.hot) return;
+    g.save();
+    g.globalCompositeOperation = 'destination-over';
+    g.globalAlpha = 0.6;
+    g.fillStyle = col.hot;
+    list.forEach(h => {
+      if (Array.isArray(h)) {
+        if (!J[h[0]] || !J[h[1]]) return;
+        line(g, [J[h[0]], J[h[1]]], col.hot, 30);
+      } else if (J[h]) {
+        const [x, y] = P(J[h]);
+        g.beginPath(); g.arc(x, y, 21, 0, Math.PI * 2); g.fill();
+      }
+    });
+    g.restore();
+  }
+
+  /* 通り道を点線で引き、向かう先に矢印をつける。forward が false なら B→A */
+  function arrows(g, def, col, forward) {
+    g.save();
+    g.globalAlpha = 0.9;
+    pathsOf(def).forEach(pts0 => {
+      const pts = forward ? pts0 : pts0.slice().reverse();
+      g.setLineDash([6, 5]);
+      line(g, pts, col.accent, 3.5);
+      g.setLineDash([]);
+      const a = pts[pts.length - 1];
+      let b = pts[pts.length - 2];
+      for (let i = pts.length - 2; i >= 0 && Math.hypot(a.x - pts[i].x, a.y - pts[i].y) < 8; i--) b = pts[i];
+      const [ax, ay] = P(a), [bx, by] = P(b);
+      const t = Math.atan2(ay - by, ax - bx);
+      g.fillStyle = col.accent;
+      g.beginPath();
+      g.moveTo(ax + 8 * Math.cos(t), ay + 8 * Math.sin(t));
+      g.lineTo(ax - 10 * Math.cos(t) + 9 * Math.sin(t), ay - 10 * Math.sin(t) - 9 * Math.cos(t));
+      g.lineTo(ax - 10 * Math.cos(t) - 9 * Math.sin(t), ay - 10 * Math.sin(t) + 9 * Math.cos(t));
+      g.closePath(); g.fill();
+    });
+    g.restore();
+  }
+
   function colors() {
     const cs = getComputedStyle(document.documentElement);
     const v = n => cs.getPropertyValue(n).trim();
     return {
       ink: v('--ink'), far: v('--ink-sub'), floor: v('--line'), accent: v('--accent'),
-      card: v('--card'), font: getComputedStyle(document.body).fontFamily,
+      card: v('--card'), hot: v('--hot'), font: getComputedStyle(document.body).fontFamily,
     };
   }
 
-  /* 関節に点を打ち、線を引いた先にポイントを書く。置き場所は関節の横で、
-   * 体の中心から離れる側。先に置いた吹き出しと重なるときは上下にずらす */
-  function cue(g, J, c, col, placed) {
+  /* 四角の中に、もう描いてあるもの(体・矢印)がどれだけあるか。間引いて数える */
+  function inkIn(g, x, y, w, h) {
+    const r = g.getTransform ? g.getTransform().a : 1;
+    const d = g.getImageData(Math.round(x * r), Math.round(y * r),
+      Math.max(1, Math.round(w * r)), Math.max(1, Math.round(h * r))).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 20) if (d[i] > 40) n++;
+    return n;
+  }
+
+  /* 関節に点を打ち、線を引いた先にポイントを書く。置き場所は関節の左右・上下の候補から、
+   * 体や矢印、先に置いた吹き出しにかぶらないところを選ぶ。
+   * memo に前の置き場所を覚え、ほぼ同じならそのままにする(動くたびに跳ねないように) */
+  function cue(g, J, c, col, placed, memo, id) {
     const at = J[c.at];
     if (!at) return;
     const [x, y] = P(at);
@@ -851,14 +962,23 @@
     const w = g.measureText(c.text).width + 14, h = 22;
     const cx = J.mid ? P(J.mid)[0] : W / 2;
     const right = x === cx ? x < W / 2 : x > cx;
-    let bx = right ? x + 26 : x - 26 - w;
-    if (bx < 4 || bx + w > W - 4) bx = right ? x - 26 - w : x + 26;   // 入らなければ反対側
-    bx = Math.max(4, Math.min(W - w - 4, bx));
-    let by = Math.max(4, Math.min(H - h - 4, y - 24 - h / 2));
-    for (let n = 0; n < 4 && placed.some(r => bx < r.x + r.w && r.x < bx + w && by < r.y + r.h && r.y < by + h); n++) {
-      by = by > H / 2 ? by - h - 6 : by + h + 6;
-      by = Math.max(4, Math.min(H - h - 4, by));
+    const xs = right ? [x + 26, x - 26 - w] : [x - 26 - w, x + 26];
+    const cands = [];
+    [y - 30 - h, y - 62 - h, y + 26].forEach(yy => xs.forEach(xx => cands.push([xx, yy])));
+    const score = k => {
+      const [x0, y0] = cands[k];
+      const bx = Math.max(4, Math.min(W - w - 4, x0)), by = Math.max(4, Math.min(H - h - 4, y0));
+      const hit = placed.some(r => bx < r.x + r.w + 4 && r.x < bx + w + 4 && by < r.y + r.h + 4 && r.y < by + h + 4);
+      return { bx: bx, by: by, s: inkIn(g, bx, by, w, h) + (hit ? 5000 : 0) + k * 4 + Math.abs(bx - x0) };
+    };
+    let best = null, bestK = 0;
+    cands.forEach((_, k) => { const r = score(k); if (!best || r.s < best.s) { best = r; bestK = k; } });
+    if (memo && memo[id] !== undefined && memo[id] !== bestK) {
+      const prev = score(memo[id]);
+      if (prev.s <= best.s + 25) { best = prev; bestK = memo[id]; }
     }
+    if (memo) memo[id] = bestK;
+    const bx = best.bx, by = best.by;
     placed.push({ x: bx, y: by, w: w, h: h });
     g.strokeStyle = col.accent; g.lineWidth = 1.5;
     g.beginPath(); g.moveTo(x, y); g.lineTo(bx + w / 2, by + h / 2); g.stroke();
@@ -877,7 +997,7 @@
       const [name, len, a, b, tag] = p;
       if (t < len) {
         return {
-          p: lerp(a, b, ease(t / len)), tag: tag || name,
+          p: lerp(a, b, ease(t / len)), tag: tag || name, dir: Math.sign(b - a),
           label: name === '止める' ? '止める ' + Math.ceil(len - t) : name,
         };
       }
@@ -891,8 +1011,11 @@
     const col = colors();
     const f = frameOf(def.phases, def.cycle, sec);
     const J = def.draw(g, lerpPose(def.A, def.B, f.p), col) || {};
+    hotSpots(g, J, def, col);
+    if (f.dir) arrows(g, def, col, f.dir > 0);
     const placed = [], on = [];
-    def.cues.forEach((c, i) => { if (c.when === f.tag) { cue(g, J, c, col, placed); on.push(i); } });
+    def._cuePos = def._cuePos || {};
+    def.cues.forEach((c, i) => { if (c.when === f.tag) { cue(g, J, c, col, placed, def._cuePos, i); on.push(i); } });
     return { label: f.label, on: on };
   }
 
@@ -901,6 +1024,8 @@
     const f = DEFS[key];
     if (!f) return null;
     const d = f(Number(lv) || 0);
+    d.hot = HOT[key] || [];
+    d.move = MOVE[key] || [];
     d.phases = withPauses(d.phases);
     d.cycle = d.phases.reduce((n, p) => n + p[1], 0);
     return d;
@@ -912,7 +1037,7 @@
   function Player(cv, def, onFrame) {
     const r = window.devicePixelRatio || 1;
     cv.width = W * r; cv.height = H * r;
-    const g = cv.getContext('2d');
+    const g = cv.getContext('2d', { willReadFrequently: true });
     g.setTransform(r, 0, 0, r, 0, 0);
     this.playing = !reduce;
     this.speed = 1;
@@ -932,7 +1057,18 @@
     this.stop = () => cancelAnimationFrame(raf);
   }
 
+  /* 時刻を外から渡して1枚ずつ描く(タイマー画面で回数と合わせるため) */
+  function Frame(cv) {
+    const r = window.devicePixelRatio || 1;
+    cv.width = W * r; cv.height = H * r;
+    const g = cv.getContext('2d', { willReadFrequently: true });
+    g.setTransform(r, 0, 0, r, 0, 0);
+    this.draw = (def, sec) => render(g, def, sec);
+  }
+
   window.Anime = {
+    reduce: reduce,
+    Frame: Frame,
     has: key => !!DEFS[key],
     keys: () => Object.keys(DEFS),
     make: make,

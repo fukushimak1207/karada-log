@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v47';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v48';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -1754,63 +1754,63 @@ const SEC_MIN = 20, SEC_MAX = 60, SEC_STEP = 5;
  * ref はお手本の動画。種目1つだけを解説しているものを選んであるので、頭から見ればよい。 */
 const EXERCISES = [
   // 下半身
-  { key: 'squat', ref: 'Up9TBV6gnJ8', name: 'スクワット', part: 'lower', type: 'bw',
+  { key: 'squat', ref: 'Up9TBV6gnJ8', name: 'スクワット', target: 'お尻・もも', part: 'lower', type: 'bw',
     levels: ['椅子に座って立つ', 'スクワット', '片脚を椅子に乗せて'],
     how: '足は肩幅。お尻を後ろへ引きながら下ろす。ひざがつま先より前に出すぎないように。' },
-  { key: 'hip', ref: 'URkCqPODZcE', name: 'ヒップリフト', part: 'lower', type: 'bw',
+  { key: 'hip', ref: 'URkCqPODZcE', name: 'ヒップリフト', target: 'お尻・もも裏', part: 'lower', type: 'bw',
     levels: ['両脚', '片脚', '片脚＋上で3秒止める'],
     how: '仰向けでひざを立て、お尻を持ち上げる。上で尻に力を入れてから下ろす。' },
-  { key: 'calf', ref: 'oVbkeODJNSE', name: 'カーフレイズ', part: 'lower', type: 'bw',
+  { key: 'calf', ref: 'oVbkeODJNSE', name: 'カーフレイズ', target: 'ふくらはぎ', part: 'lower', type: 'bw',
     levels: ['両脚', '片脚', '片脚＋段差に乗って'],
     how: 'かかとを上げてつま先立ち。上で止めて、ゆっくり下ろす。' },
-  { key: 'tdead', ref: '3Ep1FkBS5FY', name: 'チューブ デッドリフト', part: 'lower', type: 'tube', step: 5,
+  { key: 'tdead', ref: '3Ep1FkBS5FY', name: 'チューブ デッドリフト', target: 'お尻・もも裏・背中', part: 'lower', type: 'tube', step: 5,
     how: 'チューブを両足で踏み、ハンドルを持つ。背中を丸めずお尻を引いて下ろし、立ち上がる。' },
 
   // 上半身（押す）
-  { key: 'push', ref: '5SBAn4WnHWI', name: '腕立て', part: 'upper', type: 'bw',
+  { key: 'push', ref: '5SBAn4WnHWI', name: '腕立て', target: '胸・二の腕', part: 'upper', type: 'bw',
     levels: ['壁に手をついて', 'ひざをついて', '腕立て', '足を台に乗せて'],
     how: '手は肩幅より少し外。体を一直線に保ったまま下ろす。肘は45度くらいに引く。' },
-  { key: 'pike', ref: '7oIAgIANYr8', name: 'パイクプッシュアップ', part: 'upper', type: 'bw',
+  { key: 'pike', ref: '7oIAgIANYr8', name: 'パイクプッシュアップ', target: '肩・二の腕', part: 'upper', type: 'bw',
     levels: ['ひざをついて', '腰を高く上げて', '足を台に乗せて'],
     how: 'お尻を高く上げた山の形から、頭を床へ下ろす。肩に効かせる種目。' },
-  { key: 'tpress', ref: 'HbHkX8Ldwd4', name: 'チューブ チェストプレス', part: 'upper', type: 'tube', step: 4,
+  { key: 'tpress', ref: 'HbHkX8Ldwd4', name: 'チューブ チェストプレス', target: '胸・二の腕', part: 'upper', type: 'tube', step: 4,
     how: 'ドアアンカーを背中側、胸の高さに。両手を前へ押し出す。胸を張ったまま。' },
-  { key: 'tshoulder', ref: '1UIwVYKGNjw', name: 'チューブ ショルダープレス', part: 'upper', type: 'tube', step: 2,
+  { key: 'tshoulder', ref: '1UIwVYKGNjw', name: 'チューブ ショルダープレス', target: '肩', part: 'upper', type: 'tube', step: 2,
     how: 'チューブを足で踏み、ハンドルを肩の高さから真上へ。腰を反らせない。' },
-  { key: 'ttriceps', ref: 'zznC3G507DQ', name: 'チューブ フレンチプレス', part: 'upper', type: 'tube', step: 1,
+  { key: 'ttriceps', ref: 'zznC3G507DQ', name: 'チューブ フレンチプレス', target: '二の腕', part: 'upper', type: 'tube', step: 1,
     how: 'ドアアンカーを上に。肘を固定したまま、前腕だけで下へ押す。二の腕の裏。' },
 
   // 背中（引く）
-  { key: 'tlat', ref: '4sNVdIwGqfM', name: 'チューブ ラットプルダウン', part: 'back', type: 'tube', step: 3,
+  { key: 'tlat', ref: '4sNVdIwGqfM', name: 'チューブ ラットプルダウン', target: '背中・わきの下', part: 'back', type: 'tube', step: 3,
     how: 'ドアアンカーを一番上に。両手を頭の上から胸の横へ引き下ろす。肩甲骨を下げる。' },
-  { key: 'trow', ref: 'XfQd0QojYqU', name: 'チューブ シーテッドロウ', part: 'back', type: 'tube', step: 4,
+  { key: 'trow', ref: 'XfQd0QojYqU', name: 'チューブ シーテッドロウ', target: '背中・肩甲骨まわり', part: 'back', type: 'tube', step: 4,
     how: '長座でチューブを足裏に掛ける。肘をわき腹に沿わせて後ろへ引く。胸を張ったまま。' },
-  { key: 'tbrow', ref: 'LXYWCQiLT8Q', name: 'チューブ ベントオーバーロウ', part: 'back', type: 'tube', step: 4,
+  { key: 'tbrow', ref: 'LXYWCQiLT8Q', name: 'チューブ ベントオーバーロウ', target: '背中', part: 'back', type: 'tube', step: 4,
     how: 'チューブを両足で踏み、上体を前に倒す。背中を丸めず、おへそへ引き上げる。' },
-  { key: 'tapart', ref: 'PNM_OgNcwB8', name: 'チューブ プルアパート', part: 'back', type: 'tube', step: 1,
+  { key: 'tapart', ref: 'PNM_OgNcwB8', name: 'チューブ プルアパート', target: '肩の後ろ・肩甲骨まわり', part: 'back', type: 'tube', step: 1,
     how: '両手でハンドルを持ち、胸の前で左右へ開く。肩甲骨を寄せる。アンカーは要らない。' },
-  { key: 'tface', ref: 'Bx-cGh7ExzA', name: 'チューブ フェイスプル', part: 'back', type: 'tube', step: 2,
+  { key: 'tface', ref: 'Bx-cGh7ExzA', name: 'チューブ フェイスプル', target: '肩の後ろ・肩甲骨まわり', part: 'back', type: 'tube', step: 2,
     how: 'ドアアンカーを顔の高さに。両手を顔の横へ引き、肩甲骨を寄せる。抱っこの凝りに効く。' },
-  { key: 'tpullover', ref: '_bYXuRTq8wQ', name: 'チューブ プルオーバー', part: 'back', type: 'tube', step: 2,
+  { key: 'tpullover', ref: '_bYXuRTq8wQ', name: 'チューブ プルオーバー', target: '背中・胸', part: 'back', type: 'tube', step: 2,
     how: 'ドアアンカーを上に。肘を伸ばしたまま、腕を前へ下ろす。脇の下が働く。' },
 
   // 体幹
-  { key: 'plank', ref: 'UgkU2S8VUX4', name: 'プランク', part: 'core', type: 'bw', unit: 'sec',
+  { key: 'plank', ref: 'UgkU2S8VUX4', name: 'プランク', target: 'おなか', part: 'core', type: 'bw', unit: 'sec',
     levels: ['ひざをついて', 'プランク', '片脚を上げて'],
     how: '肘と足で体を支え、頭からかかとまで一直線。腰を反らせない。' },
-  { key: 'splank', ref: 'AKUGmosS7fM', name: 'サイドプランク', part: 'core', type: 'bw', unit: 'sec',
+  { key: 'splank', ref: 'AKUGmosS7fM', name: 'サイドプランク', target: 'わき腹', part: 'core', type: 'bw', unit: 'sec',
     levels: ['ひざをついて', 'サイドプランク'],
     how: '横向きで肘と足で支える。腰を落とさない。左右それぞれ。' },
-  { key: 'legraise', ref: 'y_sZA8ixCBw', name: 'レッグレイズ', part: 'core', type: 'bw',
+  { key: 'legraise', ref: 'y_sZA8ixCBw', name: 'レッグレイズ', target: '下腹', part: 'core', type: 'bw',
     levels: ['ひざを曲げて', '脚を伸ばして', '床すれすれで止める'],
     how: '仰向けで脚を上げ下げ。腰が浮かないよう、手をお尻の下に入れてもよい。' },
-  { key: 'deadbug', ref: 'Wb7_mqepkfw', name: 'デッドバグ', part: 'core', type: 'bw',
+  { key: 'deadbug', ref: 'Wb7_mqepkfw', name: 'デッドバグ', target: 'おなかの奥', part: 'core', type: 'bw',
     levels: ['腕だけ', '腕と脚', '脚を伸ばして'],
     how: '仰向けで両手両ひざを上げ、対角の手と脚をゆっくり伸ばす。腰を床につけたまま。' },
-  { key: 'roller', ref: '2qj-0vvKShY', name: '腹筋ローラー', part: 'core', type: 'bw', gear: ['ローラー'],
+  { key: 'roller', ref: '2qj-0vvKShY', name: '腹筋ローラー', target: 'おなか', part: 'core', type: 'bw', gear: ['ローラー'],
     levels: ['ひざをついて半分', 'ひざをついて', '立ちコロ'],
     how: 'ひざをついて前へ転がす。腰が反る手前で止めて戻す。' },
-  { key: 'tchop', ref: 'l9bah5HOFjA', name: 'チューブ ウッドチョップ', part: 'core', type: 'tube', step: 1,
+  { key: 'tchop', ref: 'l9bah5HOFjA', name: 'チューブ ウッドチョップ', target: 'わき腹・おなか', part: 'core', type: 'tube', step: 1,
     how: 'ドアアンカーを上に。斜め下へ振り下ろすようにひねる。左右それぞれ。' },
 ];
 
@@ -2074,11 +2074,19 @@ function clearDraft(key) {
   save();
 }
 
+/* 「次は ◯◯」に出す名前。チューブの種目は、休んでいる間に持ち替えられるよう色も出す */
+function nextLabel(key, name, side) {
+  const ex = exOf(key);
+  const s = side ? '　' + side : '';
+  const lb = ex && ex.type === 'tube' ? loadLabel(key) : '';
+  return name + s + (lb ? '　' + lb : '');
+}
+
 function buildSession(items) {
   const steps = [];
   if (!items || !items.length) return steps;
 
-  steps.push({ kind: 'lead', sec: LEAD_SEC, next: items[0].name });
+  steps.push({ kind: 'lead', sec: LEAD_SEC, next: nextLabel(items[0].key, items[0].name) });
 
   items.forEach((ex, i) => {
     const r = rxOf(ex.key);
@@ -2104,14 +2112,16 @@ function buildSession(items) {
         });
         // 右から左へ移る間。持ち替え・組み替えのぶんだけ空ける
         if (si < sides.length - 1) {
-          steps.push({ kind: 'rest', sec: REST_SIDE, next: ex.name + '　' + sides[si + 1] });
+          steps.push({ kind: 'rest', sec: REST_SIDE, next: nextLabel(ex.key, ex.name, sides[si + 1]) });
         }
       });
       if (last && set === nSets) break;
       steps.push({
         kind: 'rest',
         sec: set === nSets ? restSec('ex') : restOf(ex.key),
-        next: set === nSets ? items[i + 1].name : ex.name,
+        next: set === nSets
+          ? nextLabel(items[i + 1].key, items[i + 1].name)
+          : nextLabel(ex.key, ex.name),
       });
     }
   });
@@ -2178,6 +2188,15 @@ function measureFormHtml() {
   </div>`;
 }
 
+/* 「効くところ」の札。中黒で区切って並べる */
+function tagsHtml(key) {
+  const ex = exOf(key);
+  if (!ex || !ex.target) return '';
+  return '<span class="tags">'
+    + ex.target.split('・').map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')
+    + '</span>';
+}
+
 function exCardHtml(ex) {
   const r = rxOf(ex.key);
   const sec = ex.unit === 'sec';
@@ -2202,7 +2221,7 @@ function exCardHtml(ex) {
 
   return `
   <div class="card ex-card">
-    <p class="vtitle">${escapeHtml(ex.name)}</p>
+    <p class="vtitle">${escapeHtml(ex.name)}　${tagsHtml(ex.key)}</p>
     <p class="ex-target"><strong>${r.reps}${unit}</strong> × ${setsOf(ex.key)}セット</p>
     <p class="ex-load">${escapeHtml(loadLabel(ex.key))}</p>
     <p class="note">${escapeHtml(ex.how)}</p>
@@ -2468,6 +2487,7 @@ function startRun(key) {
   $('#run').hidden = false;
   openStep();
   runTimer = setInterval(runTick, 200);
+  startRunAnim();
 }
 
 function openStep() {
@@ -2614,6 +2634,7 @@ function stopRun() { endRun(false); }
  * 全セット目標に届いて初めて目標が上がる、という数え方にそろえるため。 */
 function endRun(keep) {
   const got = keep && run ? run.got : {};
+  stopRunAnim();
   clearInterval(runTimer);
   runTimer = null;
   keepAwake(false);
@@ -2635,6 +2656,49 @@ function endRun(keep) {
   toast(n ? n + '種目を記録しました' : 'やめました');
 }
 
+/* タイマー画面のお手本。1回ぶんの長さにアニメの1周を合わせ、音と同じ瞬間に始める。
+ * 秒で数える種目と、構える間・休みは、そのままの速さで流す */
+let runFrame = null, runRaf = 0;
+const runDefs = {};
+
+function runDefOf(key) {
+  if (!key || !window.Anime || !window.Anime.has(key)) return null;
+  if (!(key in runDefs)) {
+    const ex = exOf(key);
+    runDefs[key] = ex ? window.Anime.make(key, clampLoad(ex, rxOf(key).load)) : null;
+  }
+  return runDefs[key];
+}
+
+function drawRunAnim() {
+  if (!run) return;
+  const st = run.steps[run.i];
+  const def = st && st.kind === 'work' ? runDefOf(st.key) : null;
+  const cv = $('#run-cv');
+  cv.hidden = !def;
+  if (def) {
+    const leftMs = Math.max(0, runLeft());
+    const elapsed = (st.sec * 1000 - leftMs) / 1000;
+    const per = st.unit === 'rep' ? (st.tempo || TEMPO_SEC) : 0;
+    const sec = per ? (elapsed % per) / per * def.cycle : elapsed;
+    runFrame.draw(def, window.Anime.reduce ? 0 : sec);
+  }
+  runRaf = requestAnimationFrame(drawRunAnim);
+}
+
+function startRunAnim() {
+  cancelAnimationFrame(runRaf);
+  if (!window.Anime || !window.Anime.Frame) return;
+  runFrame = runFrame || new window.Anime.Frame($('#run-cv'));
+  drawRunAnim();
+}
+
+function stopRunAnim() {
+  cancelAnimationFrame(runRaf);
+  runRaf = 0;
+  $('#run-cv').hidden = true;
+}
+
 function renderRun(st, left) {
   const sec = Math.max(0, left);
   const end = st.kind === 'end';
@@ -2648,6 +2712,7 @@ function renderRun(st, left) {
   $('#run-count').textContent = st.kind === 'work' && st.unit === 'rep'
     ? doneFrom(st, st.sec - sec) + ' / ' + st.target + '回'
     : '';
+  $('#run-tags').innerHTML = st.kind === 'work' ? tagsHtml(st.key) : '';
   $('#run-next').textContent = !end && st.next ? '次は ' + st.next : '';
   $('#run-skip').textContent = run && run.waiting ? 'おわり' : 'ここまで';
   $('#run-rest').hidden = st.kind !== 'rest';
@@ -2709,6 +2774,7 @@ function openDemo(key) {
   closeDemo();
   $('#demo-name').textContent = ex.name;
   $('#demo-load').textContent = loadLabel(key);
+  $('#demo-tags').innerHTML = tagsHtml(key);
   $('#demo-video').hidden = false;
   $('#demo-frame').innerHTML = '';
   $('#demo-pts').innerHTML = def.cues.map(c => `<li>${escapeHtml(c.text)}</li>`).join('');
