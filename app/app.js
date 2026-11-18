@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v48';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v49';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2086,7 +2086,15 @@ function buildSession(items) {
   const steps = [];
   if (!items || !items.length) return steps;
 
-  steps.push({ kind: 'lead', sec: LEAD_SEC, next: nextLabel(items[0].key, items[0].name) });
+  const first = items[0];
+  // 構えている間も、これから始める種目のお手本を出すので、その情報を持たせる
+  steps.push({
+    kind: 'lead', sec: LEAD_SEC,
+    key: first.key,
+    unit: first.unit === 'sec' ? 'sec' : 'rep',
+    tempo: tempoOf(first.key),
+    next: nextLabel(first.key, first.name),
+  });
 
   items.forEach((ex, i) => {
     const r = rxOf(ex.key);
@@ -2673,9 +2681,12 @@ function runDefOf(key) {
 function drawRunAnim() {
   if (!run) return;
   const st = run.steps[run.i];
-  const def = st && st.kind === 'work' ? runDefOf(st.key) : null;
+  const show = st && (st.kind === 'work' || st.kind === 'lead');
+  const def = show ? runDefOf(st.key) : null;
   const cv = $('#run-cv');
   cv.hidden = !def;
+  // 横に倒したとき、お手本を左半分へ置くかどうか
+  $('#run').classList.toggle('wide-anim', !!def);
   if (def) {
     const leftMs = Math.max(0, runLeft());
     const elapsed = (st.sec * 1000 - leftMs) / 1000;
@@ -2697,6 +2708,7 @@ function stopRunAnim() {
   cancelAnimationFrame(runRaf);
   runRaf = 0;
   $('#run-cv').hidden = true;
+  $('#run').classList.remove('wide-anim');
 }
 
 function renderRun(st, left) {
@@ -2715,6 +2727,8 @@ function renderRun(st, left) {
   $('#run-tags').innerHTML = st.kind === 'work' ? tagsHtml(st.key) : '';
   $('#run-next').textContent = !end && st.next ? '次は ' + st.next : '';
   $('#run-skip').textContent = run && run.waiting ? 'おわり' : 'ここまで';
+  // 終わりの一覧は縦に長いので、横に倒したときの二列組みから外す
+  $('#run').classList.toggle('run-end', end);
   $('#run-rest').hidden = st.kind !== 'rest';
   $('#run-pause').hidden = end;
   $('#run-pause').textContent = run && run.paused ? '再開' : '一時停止';

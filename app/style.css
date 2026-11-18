@@ -441,6 +441,35 @@ body.no-scroll { overflow: hidden; }
 /* お手本を出しているときは、秒の文字を小さくして画面に収める */
 #run-cv:not([hidden]) ~ #run-num { font-size: 3.4rem; margin: 2px 0; }
 
+/* 横に倒したとき。お手本を左半分いっぱいに置き、文字とボタンは右半分へ寄せる。
+   高さで区切っているので、タブレットやPCの横長では縦のままになる */
+@media (orientation: landscape) and (max-height: 600px) {
+  #run { gap: 2px; padding: 8px 14px; justify-content: center; }
+  #run-name { font-size: 1.25rem; }
+  #run-next { margin: 4px 0 8px; }
+  #run .btn-row { margin: 2px 0; }
+  #run .btn { padding: 10px 0; }
+  /* 高さが足りないので、数字と「直す」まわりを詰める */
+  #run-num { font-size: 3rem; margin: 2px 0; }
+  #run-count { font-size: 1.8rem; }
+  #run-ask { margin: 2px 0 6px; }
+  #run-ask-name { margin: 0 0 2px; }
+  #run-ask-val { font-size: 1.5rem; }
+  #run .ask-row .btn { font-size: 1.2rem; padding: 6px 0; }
+
+  /* お手本が無い画面(休み・終わり)は、収まらないぶんを右の列へ送る */
+  #run:not(.wide-anim):not(.run-end) { flex-wrap: wrap; align-content: center; column-gap: 24px; }
+  #run:not(.wide-anim):not(.run-end) > * { max-width: 46vw; }
+
+  #run.wide-anim { padding-left: 52%; }
+  #run.wide-anim #run-cv {
+    position: absolute; left: 1.5%; top: 50%; transform: translateY(-50%);
+    height: 90%; width: auto; max-width: 48%; margin: 0;
+  }
+  #run.wide-anim #run-num { font-size: 2.8rem; margin: 0; }
+  #run.wide-anim #run-count { font-size: 1.6rem; }
+}
+
 /* 効くところの札 */
 .tags { display: inline-flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
 .tag { background: var(--hot-soft); color: var(--hot-ink); border-radius: 999px;
