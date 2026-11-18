@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v49';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v50';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2462,6 +2462,27 @@ function keepAwake(on) {
   } catch (e) {}
 }
 
+/* 運動の間だけ横向きに固定する。全画面でないと固定できない端末があるので、
+ * 断られたら全画面にしてもう一度だけ試す。できない端末(iPhone など)では
+ * 何も起きず、手で横に倒したときだけ横の並びになる */
+function lockLandscape() {
+  const o = typeof screen !== 'undefined' && screen.orientation;
+  if (!o || !o.lock) return;
+  o.lock('landscape').catch(() => {
+    const el = document.documentElement;
+    if (!el.requestFullscreen) return;
+    el.requestFullscreen().then(() => o.lock('landscape')).catch(() => {});
+  });
+}
+
+function unlockOrientation() {
+  try {
+    const o = typeof screen !== 'undefined' && screen.orientation;
+    if (o && o.unlock) o.unlock();
+  } catch (e) {}
+  try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+}
+
 /* key を渡せばその種目だけ、渡さなければメニューを頭から流す */
 /* カードの「記録」から、終わりの確認画面だけを開く。
  * タイマーを通したときと同じ画面で、同じように直してから記録する。 */
@@ -2492,6 +2513,7 @@ function startRun(key) {
 
   run = { steps: buildSession(items), i: 0, got: {}, endAt: 0, tick: -1 };
   keepAwake(true);
+  lockLandscape();
   $('#run').hidden = false;
   openStep();
   runTimer = setInterval(runTick, 200);
@@ -2646,6 +2668,7 @@ function endRun(keep) {
   clearInterval(runTimer);
   runTimer = null;
   keepAwake(false);
+  unlockOrientation();
   try { if (audioCtx) audioCtx.close(); } catch (e) {}
   audioCtx = null;
   run = null;

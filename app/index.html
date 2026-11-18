@@ -98,33 +98,39 @@
   </div>
 
   <!-- 実行中の画面。メニューを頭から流す -->
+  <!-- 横に倒したとき、A が左半分・B が右半分になる。
+       縦のときは両方 display:contents にして、order で今までどおりの並びに戻す -->
   <div id="run" hidden>
-    <p id="run-name"></p>
-    <p id="run-sub"></p>
-    <p id="run-tags"></p>
-    <canvas id="run-cv" hidden></canvas>
-    <p id="run-num"></p>
-    <p id="run-count"></p>
-    <div id="run-rest" class="btn-row" hidden>
-      <button id="run-rest-minus" class="btn small">−15秒</button>
-      <button id="run-rest-plus" class="btn small">＋15秒</button>
-    </div>
-    <p id="run-next"></p>
-    <div id="run-list" hidden></div>
-    <div id="run-ask" hidden>
-      <p id="run-ask-name"></p>
-      <div class="ask-row">
-        <button id="run-ask-minus" class="btn">−</button>
-        <span id="run-ask-val"></span>
-        <button id="run-ask-plus" class="btn">＋</button>
+    <div class="run-a">
+      <canvas id="run-cv" hidden></canvas>
+      <div id="run-rest" class="btn-row" hidden>
+        <button id="run-rest-minus" class="btn small">−15秒</button>
+        <button id="run-rest-plus" class="btn small">＋15秒</button>
+      </div>
+      <p id="run-next"></p>
+      <div id="run-ask" hidden>
+        <p id="run-ask-name"></p>
+        <div class="ask-row">
+          <button id="run-ask-minus" class="btn">−</button>
+          <span id="run-ask-val"></span>
+          <button id="run-ask-plus" class="btn">＋</button>
+        </div>
       </div>
     </div>
-    <div class="btn-row">
-      <button id="run-pause" class="btn wide">一時停止</button>
-      <button id="run-skip" class="btn wide">ここまで</button>
-    </div>
-    <div class="btn-row">
-      <button id="run-stop" class="btn wide">やめる</button>
+    <div class="run-b">
+      <p id="run-name"></p>
+      <p id="run-sub"></p>
+      <p id="run-tags"></p>
+      <p id="run-num"></p>
+      <p id="run-count"></p>
+      <div id="run-list" hidden></div>
+      <div class="btn-row run-btns">
+        <button id="run-pause" class="btn wide">一時停止</button>
+        <button id="run-skip" class="btn wide">ここまで</button>
+      </div>
+      <div class="btn-row run-btns">
+        <button id="run-stop" class="btn wide">やめる</button>
+      </div>
     </div>
   </div>
 
