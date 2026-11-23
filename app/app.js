@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v52';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v53';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -242,6 +242,7 @@ const defaultState = () => ({
   rx: {},                                             // {種目キー: {load, reps, last, updated}} 処方
   measured: null,                                     // 実力を測った日。測っていなければ null
   rxMin: 15,                                          // メニューで最後に選んだ持ち時間(分)
+  noTube: false,                                      // メニューにチューブの種目を出さない(手元に無いとき)。戻すまで続く
   rxBackup: null,                                     // 測り直す前の処方。{rx, measured}
   draft: null,                                        // {d, ex:{種目キー:[セットごとの数]}} 書きかけ
   vol: 100,                                           // 音の大きさ(0〜100)
@@ -314,16 +315,28 @@ function logsOf(d) { return state.logs.filter(l => l.d === d); }
 // 次にやる部位 = 最後に記録した1本目の部位の次。
 // 2本目(追加の1本)はローテの基準にしない。基準にすると順番が飛ぶため。
 function nextPart() {
-  // 飛ばした部位があれば、まずそこへ戻る
-  if (Array.isArray(state.owed) && PARTS.includes(state.owed[0])) return state.owed[0];
+  // 飛ばした部位があれば、まずそこへ戻る(チューブなしでできない部位は、戻せるようになるまで後回し)
+  const owed = (Array.isArray(state.owed) ? state.owed : []).find(p => PARTS.includes(p) && !skipPart(p));
+  if (owed) return owed;
   for (let i = state.logs.length - 1; i >= 0; i--) {
     const l = state.logs[i];
     // 順番を取り戻すために入れた日は、まわしの数に入れない
     if (l.slot !== 1 || l.owed) continue;
     const idx = PARTS.indexOf(l.part);
-    if (idx >= 0) return PARTS[(idx + 1) % PARTS.length];
+    if (idx < 0) continue;
+    for (let k = 1; k <= PARTS.length; k++) {
+      const p = PARTS[(idx + k) % PARTS.length];
+      if (!skipPart(p)) return p;
+    }
+    return PARTS[(idx + 1) % PARTS.length];
   }
   return PARTS[0];
+}
+
+/* チューブなしの間、まわしから外す部位(チューブを使わない種目が1つも無い部位。いまは背中)。
+ * 飛ばしたことは owed に残さないので、チューブありに戻せば順番どおりに背中が来る。 */
+function skipPart(p) {
+  return !!state.noTube && !EXERCISES.some(e => e.part === p && e.type !== 'tube');
 }
 
 /* 今日やる部位。手で入れ替えた日はそれを出す */
@@ -1964,16 +1977,17 @@ function menuFor(minutes) {
   const first = logsOf(todayStr()).find(l => l.slot === 1);
   const part = first ? first.part : todayPart();
   const n = Math.max(1, Math.round((Number(minutes) || MIN_PER_EX) / MIN_PER_EX));
-  const pool = EXERCISES.filter(e => e.part === part);
-  if (!pool.length) return { part, items: [] };
+  // 今日やった分は上に残す。消すと何をやったか分からなくなる(チューブなしに切り替えた後も)
+  const doneKeys = logsOf(todayStr()).filter(l => l.ex).map(l => l.ex);
+  const done = doneKeys.map(exOf).filter(e => e && e.part === part);
+
+  // チューブなしの間は、チューブを使う種目を出さない。背中は全部チューブなので空になる
+  const pool = EXERCISES.filter(e => e.part === part && !(state.noTube && e.type === 'tube'));
+  if (!pool.length) return { part, items: done };
 
   // ローラーは2日に1回まで(動画のときからの決まりを引き継ぐ)
   const usable = pool.filter(e => e.key !== 'roller' || rollerOk());
   const list = usable.length ? usable : pool;
-
-  // 今日やった分は上に残す。消すと何をやったか分からなくなる
-  const doneKeys = logsOf(todayStr()).filter(l => l.ex).map(l => l.ex);
-  const done = doneKeys.map(exOf).filter(e => e && e.part === part);
 
   /* 最後にやったのが古い種目から出す。記録を全部さかのぼって見る。
    * 直近12件だけを見ていたころは、4日で一回りする間に体幹の記録が窓から落ち、
@@ -2312,9 +2326,21 @@ function renderMenu() {
     .map(t => `<button type="button" class="time-tile${t === min ? ' on' : ''}" data-min="${t}">${t}分</button>`)
     .join('');
 
+  const n = Math.round(min / MIN_PER_EX);
+  const empty = state.noTube
+    ? `${escapeHtml(PART_LABEL[menu.part] || '')}の種目はどれもチューブを使います。` +
+      '上で部位を入れ替えるか、動画タブの器具なしの動画を使ってください。'
+    : '出せる種目がありません。';
   const cards = menu.items.length
-    ? menu.items.map(exCardHtml).join('')
-    : '<div class="card"><p class="note">出せる種目がありません。</p></div>';
+    ? menu.items.map(exCardHtml).join('') +
+      (state.noTube && menu.items.length < n
+        ? `<div class="card"><p class="note">チューブを使わない種目は、この部位ではここまでです。</p></div>`
+        : '')
+    : `<div class="card"><p class="note">${empty}</p></div>`;
+  const tube = `<div class="time-grid two">` +
+    [[false, 'チューブあり'], [true, 'チューブなし']].map(([v, label]) =>
+      `<button type="button" class="time-tile${!!state.noTube === v ? ' on' : ''}" data-tube="${v ? 'off' : 'on'}">${label}</button>`).join('') +
+    `</div>`;
 
   // 記録を始める前だけ、今日の部位を入れ替えられる
   const head = firstOfToday()
@@ -2325,7 +2351,8 @@ function renderMenu() {
   el.innerHTML = `
     <div class="time-grid">${times}</div>
     ${head}
-    <button id="btn-run" class="btn primary wide">全部</button>
+    ${tube}
+    ${menu.items.length ? '<button id="btn-run" class="btn primary wide">全部</button>' : ''}
     ${cards}
     <div class="btn-row">
       <button id="btn-remeasure" class="btn small">測り直す</button>
@@ -2345,6 +2372,14 @@ function bindMenu() {
     const pt = ev.target.closest('[data-part]');
     if (pt) {
       if (setTodayPart(pt.dataset.part)) renderMenu();
+      return;
+    }
+
+    const tb = ev.target.closest('[data-tube]');
+    if (tb) {
+      state.noTube = tb.dataset.tube === 'off';
+      save();
+      renderMenu();
       return;
     }
 

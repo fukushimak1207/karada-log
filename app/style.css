@@ -400,6 +400,7 @@ body.no-scroll { overflow: hidden; }
 
 /* ---- 処方型メニュー ---- */
 .time-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.time-grid.two { grid-template-columns: repeat(2, 1fr); }
 .time-tile { padding: 12px 4px; background: var(--card); color: var(--ink);
              border: 1px solid var(--line); border-radius: var(--radius);
              font-size: 1rem; font-weight: 700; cursor: pointer; }
