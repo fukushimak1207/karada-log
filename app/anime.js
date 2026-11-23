@@ -752,6 +752,50 @@
     };
   };
 
+  // クランチ: 手を太ももに沿わせて / 手を胸の前で組んで / 手を頭の後ろに添えて。
+  // 腰から下は床につけたまま、みぞおちから上だけを丸めて起こす(胴を2本に分けて描く)
+  DEFS.crunch = lv => {
+    const hands = lv === 0 ? 'thigh' : lv === 1 ? 'chest' : 'head';
+    return {
+      A: { c: 0 }, B: { c: 38 },
+      phases: UP_DOWN,
+      cues: [
+        C('上げる', 'mid', 'おへそをのぞくように丸める'), C('上げる', 'hip', '腰を反らせない'),
+        hands === 'head' ? C('上げる', 'wr', '首を手で引っ張らない') : C('上げる', 'hd', 'あごを軽く引く'),
+        C('下ろす', 'sh', 'ゆっくり下ろす'),
+      ],
+      draw(g, s, col) {
+        floor(g, col);
+        const hip = pt(150, 8);
+        const waist = pt(hip.x - 26, 8);
+        const t = 180 - s.c;                       // 上の胴の向き。180 で床に寝ている
+        const sh = step(waist, L.torso - 26, t);
+        const hd = step(sh, L.neck + L.head, t - 12);
+        // ひざを立て、足裏は床に。奥の脚は少しずらして薄く
+        const ankle = pt(222, 6), toe = pt(ankle.x + L.foot, 0);
+        const knee = ik(hip, ankle, L.thigh, L.shin, 1);
+        leg(g, [hip, pt(knee.x - 5, knee.y), pt(ankle.x - 5, ankle.y), pt(toe.x - 5, toe.y)], col, true);
+        leg(g, [hip, knee, ankle, toe], col);
+        trunk(g, hip, waist, col);
+        trunk(g, waist, sh, col);
+        headAt(g, hd, col.ink);
+        let el, wr;
+        if (hands === 'thigh') {                   // 腕を伸ばし、手をひざの方へ滑らせる
+          const a = limbs(sh, angle(sh, knee) - 4, angle(sh, knee) - 4);
+          el = a.el; wr = a.wr;
+        } else if (hands === 'chest') {            // 肘を前に出し、手を胸の上で組む
+          el = step(sh, L.upper, t + 180 + 50);
+          wr = step(el, L.fore, t + 180 + 50 + 160);
+        } else {                                   // 手は後頭部に添え、肘は横へ開く
+          wr = step(hd, 9, t + 90);
+          el = ik(sh, wr, L.upper, L.fore, -1);
+        }
+        arm(g, [sh, el, wr], col);
+        return { hip: hip, knee: knee, ankle: ankle, sh: sh, hd: hd, el: el, wr: wr, mid: mid(hip, sh) };
+      },
+    };
+  };
+
   // デッドバグ: 腕だけ / 腕と脚 / 脚を伸ばして。手前の腕と奥の脚(対角)を伸ばす
   DEFS.deadbug = lv => {
     const legs = lv >= 1, straight = lv >= 2;
@@ -846,7 +890,7 @@
     push: [['sh', 'el'], 'sh'], pike: ['sh'], tpress: ['sh'], tshoulder: ['shL', 'shR'],
     ttriceps: [['sh', 'el']], tlat: ['shL', 'shR'], trow: [['sh', 'mid']], tbrow: [['sh', 'mid']],
     tapart: ['shL', 'shR'], tface: ['shL', 'shR'], tpullover: [['sh', 'mid']],
-    plank: ['mid'], splank: ['mid'], legraise: ['mid'], deadbug: ['mid'], roller: ['mid'],
+    plank: ['mid'], splank: ['mid'], crunch: ['mid'], legraise: ['mid'], deadbug: ['mid'], roller: ['mid'],
     tchop: [['hipL', 'shR']],
   };
   /* 動く向きを矢印で見せる関節。止めている間は出さない */
@@ -855,7 +899,7 @@
     push: ['sh'], pike: ['sh'], tpress: ['wr'], tshoulder: ['wrL', 'wrR'],
     ttriceps: ['wr'], tlat: ['wrL', 'wrR'], trow: ['wr'], tbrow: ['wr'],
     tapart: ['wrL', 'wrR'], tface: ['wrL', 'wrR'], tpullover: ['wr'],
-    legraise: ['ankle'], deadbug: ['wr'], roller: ['wr'], tchop: ['wr'],
+    crunch: ['sh'], legraise: ['ankle'], deadbug: ['wr'], roller: ['wr'], tchop: ['wr'],
   };
 
   /* 描かずに関節の位置だけ求めるための、何もしない筆 */

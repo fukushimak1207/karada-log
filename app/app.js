@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v50';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v51';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -1801,6 +1801,9 @@ const EXERCISES = [
   { key: 'splank', ref: 'AKUGmosS7fM', name: 'サイドプランク', target: 'わき腹', part: 'core', type: 'bw', unit: 'sec',
     levels: ['ひざをついて', 'サイドプランク'],
     how: '横向きで肘と足で支える。腰を落とさない。左右それぞれ。' },
+  { key: 'crunch', ref: 'n15DzqPo4H4', name: 'クランチ', target: 'おなか', part: 'core', type: 'bw',
+    levels: ['手を太ももに沿わせて', '手を胸の前で組んで', '手を頭の後ろに添えて'],
+    how: '仰向けでひざを立て、おへそをのぞくように肩甲骨が浮くまで丸める。腰を反らせない。首を手で引っ張らない。' },
   { key: 'legraise', ref: 'y_sZA8ixCBw', name: 'レッグレイズ', target: '下腹', part: 'core', type: 'bw',
     levels: ['ひざを曲げて', '脚を伸ばして', '床すれすれで止める'],
     how: '仰向けで脚を上げ下げ。腰が浮かないよう、手をお尻の下に入れてもよい。' },
@@ -1940,6 +1943,9 @@ function applyMeasure(m) {
   save();
 }
 
+/* 上体や脚を動かしておなかに負荷をかける体幹種目。体幹の日はこの中から1つを必ず出す */
+const MOVING_ABS = ['crunch', 'legraise', 'roller'];
+
 /* 今日のメニュー。部位は1本目と同じローテ、種目数は選んだ時間で決まる */
 function menuFor(minutes) {
   /* 今日すでに記録があれば、その部位のまま続ける。
@@ -1965,12 +1971,23 @@ function menuFor(minutes) {
     return i < 0 ? -1 : i;
   };
 
-  const rest = list
+  const left = list
     .filter(e => !doneKeys.includes(e.key))
-    .sort((a, b) => score(a) - score(b))
-    .slice(0, Math.max(0, n - done.length));
+    .sort((a, b) => score(a) - score(b));
+  const slots = Math.max(0, n - done.length);
 
-  return { part, items: [...done, ...rest] };
+  /* 体幹の日は「動く腹筋」を必ず1つ入れる。プランク系は止まって耐えるだけで、
+   * 並び順に任せると5分・10分の日にプランク系だけになることがあるため。
+   * 今日すでに1つやっていれば足さない。ローラーは上の usable で2日に1回に絞ってある。 */
+  if (part === 'core' && slots > 0 && !done.some(e => MOVING_ABS.includes(e.key))) {
+    const ab = left.find(e => MOVING_ABS.includes(e.key));
+    if (ab) {
+      const others = left.filter(e => e !== ab).slice(0, slots - 1);
+      return { part, items: [...done, ab, ...others] };
+    }
+  }
+
+  return { part, items: [...done, ...left.slice(0, slots)] };
 }
 
 /* メニューでやった分の記録。動画の記録(logs)と同じ箱に入れる。
