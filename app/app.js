@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v51';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v52';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -1946,6 +1946,17 @@ function applyMeasure(m) {
 /* 上体や脚を動かしておなかに負荷をかける体幹種目。体幹の日はこの中から1つを必ず出す */
 const MOVING_ABS = ['crunch', 'legraise', 'roller'];
 
+/* 種目の種類。1日のメニューは、なるべく別の種類から選ぶ。
+ * 体幹は「動く(上体や脚を動かす)・止める(耐える)・わき腹」の3つ。 */
+const KIND = {
+  squat: 'もも', hip: 'お尻・もも裏', tdead: 'お尻・もも裏', calf: 'ふくらはぎ',
+  push: '胸', tpress: '胸', pike: '肩', tshoulder: '肩', ttriceps: '二の腕',
+  tlat: '縦に引く', tpullover: '縦に引く', trow: '横に引く', tbrow: '横に引く',
+  tapart: '肩の後ろ', tface: '肩の後ろ',
+  crunch: '動く', legraise: '動く', roller: '動く',
+  plank: '止める', deadbug: '止める', splank: 'わき腹', tchop: 'わき腹',
+};
+
 /* 今日のメニュー。部位は1本目と同じローテ、種目数は選んだ時間で決まる */
 function menuFor(minutes) {
   /* 今日すでに記録があれば、その部位のまま続ける。
@@ -1964,30 +1975,37 @@ function menuFor(minutes) {
   const doneKeys = logsOf(todayStr()).filter(l => l.ex).map(l => l.ex);
   const done = doneKeys.map(exOf).filter(e => e && e.part === part);
 
-  // 最近やった種目を後ろへ回して、同じものばかりにならないようにする
-  const recent = (state.logs || []).filter(l => l.ex).slice(-12).map(l => l.ex);
-  const score = e => {
-    const i = recent.lastIndexOf(e.key);
-    return i < 0 ? -1 : i;
-  };
+  /* 最後にやったのが古い種目から出す。記録を全部さかのぼって見る。
+   * 直近12件だけを見ていたころは、4日で一回りする間に体幹の記録が窓から落ち、
+   * 20分の日は毎回同じ4種目、ウッドチョップは一度も出ない、ということが起きていた。 */
+  const lastAt = {};
+  (state.logs || []).forEach((l, i) => { if (l.ex) lastAt[l.ex] = i; });
+  const age = e => (e.key in lastAt ? lastAt[e.key] : -1);
 
-  const left = list
+  let left = list
     .filter(e => !doneKeys.includes(e.key))
-    .sort((a, b) => score(a) - score(b));
+    .sort((a, b) => age(a) - age(b));
   const slots = Math.max(0, n - done.length);
+  const items = [...done];
+  const take = e => { items.push(e); left = left.filter(x => x !== e); };
 
   /* 体幹の日は「動く腹筋」を必ず1つ入れる。プランク系は止まって耐えるだけで、
    * 並び順に任せると5分・10分の日にプランク系だけになることがあるため。
    * 今日すでに1つやっていれば足さない。ローラーは上の usable で2日に1回に絞ってある。 */
   if (part === 'core' && slots > 0 && !done.some(e => MOVING_ABS.includes(e.key))) {
     const ab = left.find(e => MOVING_ABS.includes(e.key));
-    if (ab) {
-      const others = left.filter(e => e !== ab).slice(0, slots - 1);
-      return { part, items: [...done, ab, ...others] };
-    }
+    if (ab) take(ab);
   }
 
-  return { part, items: [...done, ...left.slice(0, slots)] };
+  /* 残りは、今日まだ入っていない種類を優先する(胸→肩→二の腕のように散らす)。
+   * 同じ種類どうしなら、やったのが古いほうから。 */
+  const kindOf = e => KIND[e.key] || e.key;
+  const used = k => items.filter(e => kindOf(e) === k).length;
+  while (items.length < n && left.length) {
+    take(left.reduce((best, e) => (used(kindOf(e)) < used(kindOf(best)) ? e : best)));
+  }
+
+  return { part, items };
 }
 
 /* メニューでやった分の記録。動画の記録(logs)と同じ箱に入れる。
