@@ -519,6 +519,37 @@
     };
   };
 
+  // ベンチディップス: ひざを曲げて / 脚を伸ばして / 下で2秒止める。
+  // 椅子(左)の座面の端に後ろ手をつき、体を真下へ下ろす。手と足は動かさない
+  DEFS.dips = lv => {
+    const hold = lv >= 2;
+    const HAND = pt(104, 54);
+    const ANKLE = lv === 0 ? pt(176, 4) : pt(206, 4);
+    return {
+      A: { y: 112 }, B: { y: 92 },             // 上で腕がほぼ伸び、下で肘が直角くらい
+      phases: hold ? [['下ろす', 2, 0, 1], ['止める', 2, 1, 1], ['上げる', 1, 1, 0]] : DOWN_UP,
+      cues: [
+        C('下ろす', 'el', '肘を真後ろへ曲げる'), C('下ろす', 'hip', 'お尻は椅子のすぐ前'),
+        C('上げる', 'wr', '手のひらで押し上げる'), C('上げる', 'sh', '肩をすくめない'),
+      ].concat(hold ? [C('止める', 'el', '肘が直角くらいで止める')] : []),
+      draw(g, s, col) {
+        floor(g, col);
+        chair(g, 58, 54, col);
+        const sh = pt(112, s.y);
+        const hip = pt(sh.x + 4, sh.y - L.torso);
+        const knee = ik(hip, ANKLE, L.thigh, L.shin, 1);
+        const toe = pt(ANKLE.x + L.foot, 0);
+        const el = ik(sh, HAND, L.upper, L.fore, -1);
+        const hd = step(sh, L.neck + L.head, 88);
+        leg(g, [toe, ANKLE, knee, hip], col);
+        trunk(g, hip, sh, col);
+        headAt(g, hd, col.ink);
+        arm(g, [sh, el, HAND], col);
+        return { sh: sh, el: el, wr: HAND, hip: hip, knee: knee, ankle: ANKLE, mid: mid(hip, sh) };
+      },
+    };
+  };
+
   // チューブ ラットプルダウン(アンカーは一番上)
   DEFS.tlat = () => {
     const AN = pt(160, 210);                 // 頭の真上(画面に入る高さまで)
@@ -685,6 +716,122 @@
     if (topArm) arm(g, [SH, step(SH, L.upper, 92), step(step(SH, L.upper, 92), L.fore, 92)], col, true);
     return { hip: hip, sh: SH, el: el, mid: mid(hip, SH) };
   }
+
+  /* ---------- チューブなしの背中(うつ伏せ・タオル) ---------- */
+
+  /* うつ伏せ。頭が右、足が左。t は胸を浮かせる角度、l は脚を浮かせる角度 */
+  function prone(g, col, t, l) {
+    const hip = pt(128, 9);
+    const sh = step(hip, L.torso, t);
+    const knee = step(hip, L.thigh, 180 - l);
+    const ankle = step(knee, L.shin, 180 - l);
+    const toe = step(ankle, 12, 250 - l);
+    const hd = step(sh, L.neck + L.head, t + 4);
+    leg(g, [pt(hip.x, hip.y), pt(knee.x + 3, knee.y), pt(ankle.x + 3, ankle.y)], col, true);
+    leg(g, [toe, ankle, knee, hip], col);
+    trunk(g, hip, sh, col);
+    headAt(g, hd, col.ink);
+    return { hip: hip, sh: sh, hd: hd, knee: knee, ankle: ankle, mid: mid(hip, sh) };
+  }
+
+  /* タオル。横から見ると手の所に短く見える */
+  function towel(g, wr, col) {
+    line(g, [pt(wr.x - 3, wr.y - 7), pt(wr.x + 3, wr.y + 7)], col.accent, 6);
+  }
+
+  // タオル ラットプルダウン(正面から): タオルを左右へ張ったまま、万歳から頭の高さへ引き下ろす
+  DEFS.towelpull = lv => {
+    const hold = lv >= 2;
+    return {
+      A: { x: 44, y: 196 }, B: { x: 48, y: 156 },
+      phases: hold ? [['引く', 1, 0, 1], ['止める', 2, 1, 1], ['戻す', 2, 1, 0]] : PULL,
+      cues: [
+        C('引く', 'wrR', '左右へ引っ張ったまま下ろす'), C('引く', 'elR', '肘を肩の高さまで'),
+        C('戻す', 'wrL', 'ゆっくり万歳に戻す'), C('戻す', 'shC', '肩をすくめない'),
+      ].concat(hold ? [C('止める', 'shR', '肩甲骨を寄せて止める')] : []),
+      draw(g, s, col) {
+        floor(g, col);
+        const f = front({ feet: 22 });
+        const hL = pt(160 - s.x, s.y), hR = pt(160 + s.x, s.y);
+        drawFront(g, f, col);
+        const a = frontArms(g, f, hL, hR, col);
+        line(g, [hL, hR], col.accent, 6);
+        return Object.assign(f, a);
+      },
+    };
+  };
+
+  // タオル ローイング(うつ伏せ): 胸を浮かせながら、前へ伸ばした手を胸の前へ引く
+  DEFS.towelrow = lv => {
+    const hold = lv >= 2, useTowel = lv >= 1;
+    return {
+      A: { t: 3, k: 0 }, B: { t: 18, k: 1 },
+      phases: hold ? [['引く', 1, 0, 1], ['止める', 2, 1, 1], ['戻す', 2, 1, 0]] : PULL,
+      cues: [
+        C('引く', 'el', '脇を締めて肘を引く'), C('引く', 'sh', '肩甲骨を寄せる'),
+        C('戻す', 'wr', 'ゆっくり腕を伸ばす'), C('戻す', 'hip', '腰が痛ければやめる'),
+      ].concat(hold ? [C('止める', 'mid', '胸を浮かせたまま止める')] : []),
+      draw(g, s, col) {
+        floor(g, col);
+        const b = prone(g, col, s.t, 0);
+        // 手は前へ伸ばした所から、胸の前(肩の少し前・下)へまっすぐ引く。肘は背中の側へ抜ける
+        const far = step(b.sh, ARM - 4, s.t + 2);
+        const near = pt(b.sh.x + 20, b.sh.y - 6);
+        const wr = pt(lerp(far.x, near.x, s.k), lerp(far.y, near.y, s.k));
+        const el = ik(b.sh, wr, L.upper, L.fore, 1);
+        arm(g, [b.sh, el, wr], col);
+        headAt(g, b.hd, col.ink);   // 腕は耳の横を通るので、頭を上に描き直す
+        if (useTowel) towel(g, wr, col);
+        return Object.assign(b, { el: el, wr: wr });
+      },
+    };
+  };
+
+  // リバーススノーエンジェル(うつ伏せ): 腰の横の手を、床から浮かせたまま頭の上へ回す。
+  // 横から見ると、腕は肩の所で手前を向いて短く見え、頭の先で長く伸びる
+  DEFS.snowangel = lv => {
+    const hold = lv >= 2;
+    return {
+      A: { a: 0 }, B: { a: lv === 0 ? 90 : 180 },
+      phases: hold ? [['回す', 2, 0, 1], ['止める', 2, 1, 1], ['戻す', 2, 1, 0]] : [['回す', 2, 0, 1], ['戻す', 2, 1, 0]],
+      cues: [
+        C('回す', 'wr', '手は床から浮かせたまま'), C('回す', 'sh', '肩甲骨を寄せる'),
+        C('戻す', 'wr', '同じ道で腰の横へ'), C('戻す', 'hd', '首を反らせない'),
+      ].concat(hold ? [C('止める', 'wr', '頭の上で止める')] : []),
+      draw(g, s, col) {
+        floor(g, col);
+        const b = prone(g, col, 8, 0);
+        const r = (ARM - 4) * -Math.cos(rad(s.a));
+        const wr = pt(b.sh.x + r, b.sh.y + 4 + 6 * Math.sin(rad(s.a)));
+        const el = mid(b.sh, wr);
+        arm(g, [b.sh, el, wr], col);
+        headAt(g, b.hd, col.ink);   // 腕は耳の横を通るので、頭を上に描き直す
+        return Object.assign(b, { el: el, wr: wr });
+      },
+    };
+  };
+
+  // スーパーマン(うつ伏せ): 胸と腕だけ上げて / 手と脚を上げて / 上で3秒止める
+  DEFS.superman = lv => {
+    const legs = lv >= 1, hold = lv >= 2;
+    return {
+      A: { t: 2, l: 0 }, B: { t: 16, l: legs ? 12 : 0 },
+      phases: hold ? [['上げる', 1, 0, 1], ['止める', 3, 1, 1], ['下ろす', 2, 1, 0]] : UP_DOWN,
+      cues: [
+        C('上げる', 'wr', legs ? '手と脚を同時に浮かせる' : '胸と腕を浮かせる'), C('上げる', 'hd', 'あごは引いたまま'),
+        C('下ろす', 'mid', 'ゆっくり下ろす'),
+      ].concat(hold ? [C('止める', 'hip', '腰を反らせすぎない')] : []),
+      draw(g, s, col) {
+        floor(g, col);
+        const b = prone(g, col, s.t, s.l);
+        const el = step(b.sh, L.upper, s.t + 16);
+        const wr = step(el, L.fore, s.t + 16);
+        arm(g, [b.sh, el, wr], col);
+        headAt(g, b.hd, col.ink);   // 腕は耳の横を通るので、頭を上に描き直す
+        return Object.assign(b, { el: el, wr: wr });
+      },
+    };
+  };
 
   // プランク: ひざをついて / プランク / 片脚を上げて
   DEFS.plank = lv => {
@@ -892,6 +1039,8 @@
     tapart: ['shL', 'shR'], tface: ['shL', 'shR'], tpullover: [['sh', 'mid']],
     plank: ['mid'], splank: ['mid'], crunch: ['mid'], legraise: ['mid'], deadbug: ['mid'], roller: ['mid'],
     tchop: [['hipL', 'shR']],
+    dips: [['sh', 'el']], towelpull: ['shL', 'shR'], towelrow: [['sh', 'mid']],
+    snowangel: ['sh'], superman: [['hip', 'sh']],
   };
   /* 動く向きを矢印で見せる関節。止めている間は出さない */
   const MOVE = {
@@ -900,6 +1049,7 @@
     ttriceps: ['wr'], tlat: ['wrL', 'wrR'], trow: ['wr'], tbrow: ['wr'],
     tapart: ['wrL', 'wrR'], tface: ['wrL', 'wrR'], tpullover: ['wr'],
     crunch: ['sh'], legraise: ['ankle'], deadbug: ['wr'], roller: ['wr'], tchop: ['wr'],
+    dips: ['sh'], towelpull: ['wrL', 'wrR'], towelrow: ['wr'], snowangel: ['wr'], superman: ['wr', 'ankle'],
   };
 
   /* 描かずに関節の位置だけ求めるための、何もしない筆 */

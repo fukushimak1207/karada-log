@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v54';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v55';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -424,6 +424,11 @@ function pickVideo(part, level, excludeIds) {
   const didOnce = new Set(state.logs.map(l => l.id));
   let pool = videos().filter(v => v.on !== false && v.part === part && !(v.once && didOnce.has(v.id)));
   if (!rollerOk()) pool = pool.filter(v => v.sub !== ROLLER_SUB);
+  // チューブなしのときはチューブの動画を勧めない(器具なしの動画が無い部位では外さない)
+  if (state.noTube) {
+    const free = pool.filter(v => !(v.gear || []).includes('チューブ'));
+    if (free.length) pool = free;
+  }
   if (!pool.length) pool = videos().filter(v => v.on !== false && v.part === part && !(v.once && didOnce.has(v.id)));
   if (!pool.length) pool = videos().filter(v => v.on !== false && v.part === part);
   if (!pool.length) return null;
@@ -1792,6 +1797,10 @@ const EXERCISES = [
     how: 'チューブを足で踏み、ハンドルを肩の高さから真上へ。腰を反らせない。' },
   { key: 'ttriceps', ref: 'zznC3G507DQ', name: 'チューブ フレンチプレス', target: '二の腕', part: 'upper', type: 'tube', step: 1,
     how: 'ドアアンカーを上に。肘を固定したまま、前腕だけで下へ押す。二の腕の裏。' },
+  // チューブなしのときだけ出す代わり(alt)。フレンチプレスの代わり
+  { key: 'dips', ref: 'dVZcFgiqxj8', name: 'ベンチディップス', target: '二の腕', part: 'upper', type: 'bw', alt: true,
+    levels: ['ひざを曲げて', '脚を伸ばして', '下で2秒止める'],
+    how: '動かない椅子の端に後ろ手をつき、お尻を前へ出す。肘を真後ろへ曲げて体を下ろし、手のひらで押し上げる。肩をすくめない。' },
 
   // 背中（引く）
   { key: 'tlat', ref: '4sNVdIwGqfM', name: 'チューブ ラットプルダウン', target: '背中・わきの下', part: 'back', type: 'tube', step: 3,
@@ -1806,6 +1815,19 @@ const EXERCISES = [
     how: 'ドアアンカーを顔の高さに。両手を顔の横へ引き、肩甲骨を寄せる。抱っこの凝りに効く。' },
   { key: 'tpullover', ref: '_bYXuRTq8wQ', name: 'チューブ プルオーバー', target: '背中・胸', part: 'back', type: 'tube', step: 2,
     how: 'ドアアンカーを上に。肘を伸ばしたまま、腕を前へ下ろす。脇の下が働く。' },
+  // チューブなしのときだけ出す代わり(alt)。器具はタオルだけ
+  { key: 'towelpull', ref: 'uzQNy-iebvc', name: 'タオル ラットプルダウン', target: '背中・わきの下', part: 'back', type: 'bw', alt: true,
+    levels: ['タオルを軽く張って', 'タオルを強く引き合って', '下で2秒止める'],
+    how: 'ひざ立ちか立って、万歳でタオルをピンと張って持つ。左右へ引っ張ったまま、肘を肩の高さまで下ろして肩甲骨を寄せる。肩をすくめない。' },
+  { key: 'towelrow', ref: '3GIuXzn3W0s', name: 'タオル ローイング', target: '背中・肩甲骨まわり', part: 'back', type: 'bw', alt: true,
+    levels: ['タオルなしで', 'タオルをピンと張って', '胸の前で2秒止める'],
+    how: 'うつ伏せでつま先を床につけ、肩幅でタオルを持って腕を前へ伸ばす。胸を浮かせながらタオルを胸の前へ引き、肩甲骨を寄せる。腰が痛ければやめる。' },
+  { key: 'snowangel', ref: 'GMj-5ZOdQ4E', name: 'リバーススノーエンジェル', target: '肩の後ろ・肩甲骨まわり', part: 'back', type: 'bw', alt: true,
+    levels: ['腕を横まで', '腕を頭の上まで', '頭の上で2秒止める'],
+    how: 'うつ伏せで胸を少し浮かせ、手は腰の横。手を床から浮かせたまま、弧を描いて頭の上へ回し、同じ道で戻す。首を反らせない。' },
+  { key: 'superman', ref: 'xiehNeCimMc', name: 'スーパーマン', target: '背中・お尻', part: 'back', type: 'bw', alt: true,
+    levels: ['胸と腕だけ上げて', '手と脚を上げて', '上で3秒止める'],
+    how: 'うつ伏せで両手を前へ伸ばす。手と脚を同時に少し浮かせ、ゆっくり下ろす。腰を反らせすぎない。あごは引いたまま。' },
 
   // 体幹
   { key: 'plank', ref: 'UgkU2S8VUX4', name: 'プランク', target: 'おなか', part: 'core', type: 'bw', unit: 'sec',
@@ -1932,12 +1954,13 @@ function applyMeasure(m) {
 
   const pu = Number(m.pushReps) || 0;
   const puLv = Number(m.pushLevel) || 0;
-  EXERCISES.filter(e => e.part === 'upper' && e.type === 'bw')
+  // チューブなしの代わり(alt)は段階の並びが腕立てやチューブと違うので、ここでは決めない(1段目から)
+  EXERCISES.filter(e => e.part === 'upper' && e.type === 'bw' && !e.alt)
     .forEach(e => put(e, puLv + shift(pu), target(pu, shift(pu))));
 
   const rowReps = Number(m.rowReps) || 0;
   const rowStep = Number(m.rowStep) || 2;
-  EXERCISES.filter(e => e.part === 'back')
+  EXERCISES.filter(e => e.part === 'back' && e.type === 'tube')
     .forEach(e => put(e, rowStep + shift(rowReps), target(rowReps, shift(rowReps))));
 
   const sec = Number(m.plankSec) || 0;
@@ -1966,6 +1989,7 @@ const KIND = {
   push: '胸', tpress: '胸', pike: '肩', tshoulder: '肩', ttriceps: '二の腕',
   tlat: '縦に引く', tpullover: '縦に引く', trow: '横に引く', tbrow: '横に引く',
   tapart: '肩の後ろ', tface: '肩の後ろ',
+  dips: '二の腕', towelpull: '縦に引く', towelrow: '横に引く', snowangel: '肩の後ろ', superman: '背骨',
   crunch: '動く', legraise: '動く', roller: '動く',
   plank: '止める', deadbug: '止める', splank: 'わき腹', tchop: 'わき腹',
 };
@@ -1982,7 +2006,8 @@ function menuFor(minutes) {
   const done = doneKeys.map(exOf).filter(e => e && e.part === part);
 
   // チューブなしの間は、チューブを使う種目を出さない。背中は全部チューブなので空になる
-  const pool = EXERCISES.filter(e => e.part === part && !(state.noTube && e.type === 'tube'));
+  // チューブなしのときはチューブの種目を外し、代わり(alt)を入れる。ふだんは代わりを出さない
+  const pool = EXERCISES.filter(e => e.part === part && (state.noTube ? e.type !== 'tube' : !e.alt));
   if (!pool.length) return { part, items: done };
 
   // ローラーは2日に1回まで(動画のときからの決まりを引き継ぐ)
