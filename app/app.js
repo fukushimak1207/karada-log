@@ -31,7 +31,7 @@ const ROLLER_SUB = 'ローラー';   // 腰を痛めやすいので2日に1回�
 const GEAR_CHOICES = ['なし', 'マット', 'タオル', '椅子', 'ペットボトル', 'ローラー', 'チューブ'];
 const ROLLER_REST_DAYS = 1;
 const BACKUP_REMIND_DAYS = 30;
-const APP_VERSION = 'karadalog-cf-v53';   // sw.js の CACHE_VERSION と合わせる
+const APP_VERSION = 'karadalog-cf-v54';   // sw.js の CACHE_VERSION と合わせる
 /* 体組成を測る日の知らせ。アプリは数値を持たない(測った日付だけ)。
  * Web アプリは定時に自分で通知を出せないので、開いたときに画面へ出すだけにしている。 */
 const MEASURE_GAP_WARN = 10;       // 前回からこの日数が空いたら、曜日に関係なく知らせる
@@ -2055,6 +2055,8 @@ function doneExToday(key) {
 /* ---------- 一連の実行(タイマー) ---------- */
 
 const TEMPO_SEC = 3;   // 回数の種目。1回にかける秒数(下ろす2秒・上げる1秒)
+// 動きが大きくて3秒では速すぎる種目だけ、1回の秒数を延ばす
+const TEMPO_BY = { roller: 5 };
 const REST_SET = 30;   // セット間の休み(秒)
 const REST_EX = 30;    // 種目を変えるときの休み(秒)
 const REST_MAX = 30;   // 休みはここまで。これより長くは取らない
@@ -2091,7 +2093,7 @@ function restSec(which) {
 /* 1回にかける秒数。「上で3秒止める」のような段階は、その秒数を足す */
 function tempoOf(key) {
   const m = /(\d+)秒止める/.exec(loadLabel(key) || '');
-  return TEMPO_SEC + (m ? Number(m[1]) : 0);
+  return (TEMPO_BY[key] || TEMPO_SEC) + (m ? Number(m[1]) : 0);
 }
 
 /* 何セット目のどちら側か、を順番に並べる。画面も手順もこれを元にする */
